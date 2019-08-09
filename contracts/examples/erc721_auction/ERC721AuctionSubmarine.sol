@@ -8,13 +8,13 @@ contract ERC721Auction is IERC721Receiver, LibSubmarineSimple {
   IERC721 public erc721;
   uint256 public erc721TokenId;
 
-  address public seller;
+  address payable public seller;
 
   uint32 public startBlock;
   uint32 public endCommitBlock;
   uint32 public endRevealBlock;
 
-  mapping (bytes32 => address) public bidders;
+  mapping (bytes32 => address payable) public bidders;
   bytes32 public winningSubmarineId;
 
   /// @notice This creates the auction.
@@ -22,9 +22,9 @@ contract ERC721Auction is IERC721Receiver, LibSubmarineSimple {
     address _operator,
     address _from,
     uint256 _tokenId,
-    bytes _data
+    bytes memory _data
   ) public returns(bytes4) {
-    require(address(erc721) == 0x0);
+    require(address(erc721) == address(0x0));
 
     // In solidity 0.5.0, we can just do this:
     // (startBlock, endCommitBlock) = abi.decode(_data, (uint32, uint32));
@@ -42,23 +42,24 @@ contract ERC721Auction is IERC721Receiver, LibSubmarineSimple {
     startBlock = tempStartBlock;
     endCommitBlock = tempEndBlock;
     endRevealBlock = tempEndBlock + 256;
+    // endRevealBlock = endCommitBlock + 256;
 
     require(block.number < startBlock);
     require(startBlock < endCommitBlock);
     require(endCommitBlock < endRevealBlock);
     erc721 = IERC721(msg.sender);
     erc721TokenId = _tokenId;
-    seller = _from;
+    seller = address(uint160(_from));
 
     return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
   }
 
   function onSubmarineReveal(
     bytes32 _submarineId,
-    bytes _embeddedDAppData,
+    bytes memory _embeddedDAppData,
     uint256 _value
   ) internal {
-    require(address(erc721) != 0x0);
+    require(address(erc721) != address(0x0));
     require(startBlock <= block.number && block.number <= endRevealBlock);
 
 
@@ -69,7 +70,7 @@ contract ERC721Auction is IERC721Receiver, LibSubmarineSimple {
   }
 
   function finalize(bytes32 _submarineId) external {
-    require(address(erc721) != 0x0);
+    require(address(erc721) != address(0x0));
     require(endRevealBlock < block.number);
     require(revealedAndUnlocked(_submarineId));
     require(bidders[_submarineId] == msg.sender);

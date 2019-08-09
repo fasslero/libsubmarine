@@ -42,7 +42,7 @@ CONTRACT_OWNER_ADDRESS = t.a7
 CONTRACT_OWNER_PRIVATE_KEY = t.k7
 TOKEN_ID = 3
 
-log = logging.getLogger('TestExampleAuction')
+log = logging.getLogger('TestExampleChicken')
 LOGFORMAT = "%(levelname)s:%(filename)s:%(lineno)s:%(funcName)s(): %(message)s"
 log.setLevel(logging.getLevelName('INFO'))
 logHandler = logging.StreamHandler(stream=sys.stdout)
@@ -50,7 +50,7 @@ logHandler.setFormatter(logging.Formatter(LOGFORMAT))
 log.addHandler(logHandler)
 
 
-class TestExampleAuction(unittest.TestCase):
+class TestExampleChicken(unittest.TestCase):
     def setUp(self):
         config.config_metropolis['BLOCK_GAS_LIMIT'] = 2**60
         self.chain = t.Chain(env=config.Env(config=config.config_metropolis))
@@ -115,12 +115,12 @@ class TestExampleAuction(unittest.TestCase):
             contract_creator=CONTRACT_OWNER_PRIVATE_KEY)
         self.erc721_contract.mint(CONTRACT_OWNER_ADDRESS, TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY)
 
-        self.auction_contract = deploy_solidity_contract_with_args(
+        self.chicken_contract = deploy_solidity_contract_with_args(
             chain=self.chain,
             solc_config_sources={
-                'examples/erc721_auction/ERC721AuctionSubmarine.sol': {
+                'ChickenSubmarine.sol': {
                     'urls':
-                    [os.path.join(contract_dir, 'examples/erc721_auction/ERC721AuctionSubmarine.sol')]
+                    [os.path.join(contract_dir, 'ChickenSubmarine.sol')]
                 },
                 'LibSubmarineSimple.sol': {
                     'urls':
@@ -131,9 +131,7 @@ class TestExampleAuction(unittest.TestCase):
                 },
                 'proveth/ProvethVerifier.sol': {
                     'urls': [
-                        os.path.join(contract_dir,
-                                     'proveth/ProvethVerifier.sol')
-                    ]
+                        os.path.join(contract_dir, 'proveth/ProvethVerifier.sol')]
                 },
                 'proveth/Solidity-RLP/contracts/RLPReader.sol': {
                     'urls': [os.path.join(contract_dir, 'proveth/Solidity-RLP/contracts/RLPReader.sol')]
@@ -147,16 +145,19 @@ class TestExampleAuction(unittest.TestCase):
                 'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
                     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
                 }
+                # 'proveth/RLP.sol': {
+                #     'urls': [os.path.join(contract_dir, 'proveth/RLP.sol')]
+                # },
             },
             allow_paths=root_repo_dir,
-            contract_file='examples/erc721_auction/ERC721AuctionSubmarine.sol',
-            contract_name='ERC721Auction',
+            contract_file='ChickenSubmarine.sol',
+            contract_name='ChickenSubmarine',
             startgas=10**7,
             args=[],
             contract_creator=CONTRACT_OWNER_PRIVATE_KEY)
         self.chain.mine(1)
 
-    def test_auctionWorkflow(self):
+    def test_chickenWorkflow(self):
         ##
         ## STARTING STATE
         ##
@@ -173,30 +174,32 @@ class TestExampleAuction(unittest.TestCase):
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
-        self.assertTrue(self.auction_contract.address)
-        self.assertEqual(27, self.auction_contract.vee())
+        self.assertTrue(self.chicken_contract.address)
+        self.assertEqual(27, self.chicken_contract.vee())
 
         ##
         ## START THE AUCTION
         ## (By sending the token to the auction contract, triggering onERC721Received)
         startAuctionBlock = self.chain.head_state.block_number + 1
         endCommitPeriodBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
-        onERC721RecievedDataField = encode_single_packed('(uint32,uint32)', [startAuctionBlock, endCommitPeriodBlock])
-        self.erc721_contract.safeTransferFrom(CONTRACT_OWNER_ADDRESS, self.auction_contract.address, TOKEN_ID, onERC721RecievedDataField, sender=CONTRACT_OWNER_PRIVATE_KEY)
-        self.assertEqual(rec_hex(self.auction_contract.address), self.erc721_contract.ownerOf(TOKEN_ID))
-        self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.auction_contract.seller())
-        self.assertEqual(startAuctionBlock, self.auction_contract.startBlock())
-        self.assertEqual(endCommitPeriodBlock, self.auction_contract.endCommitBlock())
-        self.assertEqual(endCommitPeriodBlock+REVEAL_PERIOD_LENGTH, self.auction_contract.endRevealBlock())
-        self.assertEqual(TOKEN_ID, self.auction_contract.erc721TokenId())
-        self.assertEqual(rec_hex(self.erc721_contract.address), self.auction_contract.erc721())
+        minBet = 10
+        endCommitBlockCrypt = COMMIT_PERIOD_LENGTH
+        onERC721RecievedDataField = encode_single_packed('(uint32,uint32,uint256,uint32)', [startAuctionBlock, endCommitPeriodBlock, minBet, endCommitBlockCrypt])
+        self.erc721_contract.safeTransferFrom(CONTRACT_OWNER_ADDRESS, self.chicken_contract.address, TOKEN_ID, onERC721RecievedDataField, sender=CONTRACT_OWNER_PRIVATE_KEY)
+        self.assertEqual(rec_hex(self.chicken_contract.address), self.erc721_contract.ownerOf(TOKEN_ID))
+        self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.chicken_contract.seller())
+        self.assertEqual(startAuctionBlock, self.chicken_contract.startBlock())
+        self.assertEqual(endCommitPeriodBlock, self.chicken_contract.endCommitBlock())
+        self.assertEqual(endCommitPeriodBlock+REVEAL_PERIOD_LENGTH, self.chicken_contract.endRevealBlock())
+        self.assertEqual(TOKEN_ID, self.chicken_contract.erc721TokenId())
+        self.assertEqual(rec_hex(self.erc721_contract.address), self.chicken_contract.erc721())
 
         #
         # GENERATE UNLOCK TXs
         #
         commitAddressAlice, commitAlice, witnessAlice, unlock_tx_hexAlice = generate_submarine_commit.generateCommitAddress(
              normalize_address(rec_hex(ALICE_ADDRESS)),
-             normalize_address(rec_hex(self.auction_contract.address)),
+             normalize_address(rec_hex(self.chicken_contract.address)),
              BID_AMOUNT_Alice, b'', OURGASPRICE, OURGASLIMIT)
 
         unlock_tx_infoAlice = rlp.decode(rec_bin(unlock_tx_hexAlice))
@@ -213,7 +216,7 @@ class TestExampleAuction(unittest.TestCase):
         )
         commitAddressBob, commitBob, witnessBob, unlock_tx_hexBob = generate_submarine_commit.generateCommitAddress(
              normalize_address(rec_hex(BOB_ADDRESS)),
-             normalize_address(rec_hex(self.auction_contract.address)),
+             normalize_address(rec_hex(self.chicken_contract.address)),
              BID_AMOUNT_Bob, b'', OURGASPRICE, OURGASLIMIT)
 
         unlock_tx_infoBob = rlp.decode(rec_bin(unlock_tx_hexBob))
@@ -230,7 +233,7 @@ class TestExampleAuction(unittest.TestCase):
         )
         commitAddressCharlie, commitCharlie, witnessCharlie, unlock_tx_hexCharlie = generate_submarine_commit.generateCommitAddress(
              normalize_address(rec_hex(CHARLIE_ADDRESS)),
-             normalize_address(rec_hex(self.auction_contract.address)),
+             normalize_address(rec_hex(self.chicken_contract.address)),
              BID_AMOUNT_Charlie, b'', OURGASPRICE, OURGASLIMIT)
 
         unlock_tx_infoCharlie = rlp.decode(rec_bin(unlock_tx_hexCharlie))
@@ -289,11 +292,11 @@ class TestExampleAuction(unittest.TestCase):
                                         BASIC_SEND_GAS_LIMIT * OURGASPRICE),
             self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
 
-        session_dataAlice = self.auction_contract.getSubmarineState(rec_bin(commitAlice))
+        session_dataAlice = self.chicken_contract.getSubmarineState(rec_bin(commitAlice))
         self.assertListEqual(session_dataAlice,
                 [SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL])
 
-        revealedAndUnlocked_boolAlice = self.auction_contract.revealedAndUnlocked(rec_bin(commitAlice))
+        revealedAndUnlocked_boolAlice = self.chicken_contract.revealedAndUnlocked(rec_bin(commitAlice))
         self.assertFalse(
             revealedAndUnlocked_boolAlice,
             "The contract should not be revealedAndUnlocked before it's even begun.")
@@ -309,11 +312,11 @@ class TestExampleAuction(unittest.TestCase):
                                         BASIC_SEND_GAS_LIMIT * OURGASPRICE),
             self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
 
-        session_dataBob = self.auction_contract.getSubmarineState(rec_bin(commitBob))
+        session_dataBob = self.chicken_contract.getSubmarineState(rec_bin(commitBob))
         self.assertListEqual(session_dataBob,
                 [SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL])
 
-        revealedAndUnlocked_boolBob = self.auction_contract.revealedAndUnlocked(rec_bin(commitBob))
+        revealedAndUnlocked_boolBob = self.chicken_contract.revealedAndUnlocked(rec_bin(commitBob))
         self.assertFalse(
             revealedAndUnlocked_boolBob,
             "The contract should not be revealedAndUnlocked before it's even begun.")
@@ -327,11 +330,11 @@ class TestExampleAuction(unittest.TestCase):
                                         BASIC_SEND_GAS_LIMIT * OURGASPRICE),
             self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
 
-        session_dataCharlie = self.auction_contract.getSubmarineState(rec_bin(commitCharlie))
+        session_dataCharlie = self.chicken_contract.getSubmarineState(rec_bin(commitCharlie))
         self.assertListEqual(session_dataCharlie,
                 [SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL, SOLIDITY_NULL_INITIALVAL])
 
-        revealedAndUnlocked_boolCharlie = self.auction_contract.revealedAndUnlocked(rec_bin(commitCharlie))
+        revealedAndUnlocked_boolCharlie = self.chicken_contract.revealedAndUnlocked(rec_bin(commitCharlie))
         self.assertFalse(
             revealedAndUnlocked_boolCharlie,
             "The contract should not be revealedAndUnlocked before it's even begun.")
@@ -393,7 +396,7 @@ class TestExampleAuction(unittest.TestCase):
         unlock_tx_unsigned_rlpAlice = rlp.encode(unlock_tx_unsigned_objectAlice, transactions.UnsignedTransaction)
 
 
-        self.auction_contract.reveal(
+        self.chicken_contract.reveal(
             commit_block_numberAlice,  # uint32 _commitBlockNumber,
             _unlockExtraData,  # bytes _commitData,
             rec_bin(witnessAlice),  # bytes32 _witness,
@@ -456,7 +459,7 @@ class TestExampleAuction(unittest.TestCase):
         unlock_tx_unsigned_rlpBob = rlp.encode(unlock_tx_unsigned_objectBob, transactions.UnsignedTransaction)
 
 
-        self.auction_contract.reveal(
+        self.chicken_contract.reveal(
             commit_block_numberBob,  # uint32 _commitBlockNumber,
             _unlockExtraData,  # bytes _commitData,
             rec_bin(witnessBob),  # bytes32 _witness,
@@ -519,7 +522,7 @@ class TestExampleAuction(unittest.TestCase):
         unlock_tx_unsigned_rlpCharlie = rlp.encode(unlock_tx_unsigned_objectCharlie, transactions.UnsignedTransaction)
 
 
-        self.auction_contract.reveal(
+        self.chicken_contract.reveal(
             commit_block_numberCharlie,  # uint32 _commitBlockNumber,
             _unlockExtraData,  # bytes _commitData,
             rec_bin(witnessCharlie),  # bytes32 _witness,
@@ -533,25 +536,25 @@ class TestExampleAuction(unittest.TestCase):
         ##
         ## CHECK THE STATE AFTER REVEAL
         ##
-        bidRecordAlice = self.auction_contract.bidders(rec_bin(commitAlice))
+        bidRecordAlice = self.chicken_contract.bidders(rec_bin(commitAlice))
         self.assertEqual(rec_hex(ALICE_ADDRESS), bidRecordAlice)
-        session_dataAlice = self.auction_contract.getSubmarineState(rec_bin(commitAlice))
+        session_dataAlice = self.chicken_contract.getSubmarineState(rec_bin(commitAlice))
         self.assertListEqual(session_dataAlice, [BID_AMOUNT_Alice, SOLIDITY_NULL_INITIALVAL, commit_block_numberAlice, commit_block_indexAlice])
-        revealedAndUnlocked_boolAlice = self.auction_contract.revealedAndUnlocked(rec_bin(commitAlice))
+        revealedAndUnlocked_boolAlice = self.chicken_contract.revealedAndUnlocked(rec_bin(commitAlice))
         self.assertFalse(revealedAndUnlocked_boolAlice)
 
-        bidRecordBob = self.auction_contract.bidders(rec_bin(commitBob))
+        bidRecordBob = self.chicken_contract.bidders(rec_bin(commitBob))
         self.assertEqual(rec_hex(BOB_ADDRESS), bidRecordBob)
-        session_dataBob = self.auction_contract.getSubmarineState(rec_bin(commitBob))
+        session_dataBob = self.chicken_contract.getSubmarineState(rec_bin(commitBob))
         self.assertListEqual(session_dataBob, [BID_AMOUNT_Bob, SOLIDITY_NULL_INITIALVAL, commit_block_numberBob, commit_block_indexBob])
-        revealedAndUnlocked_boolBob = self.auction_contract.revealedAndUnlocked(rec_bin(commitBob))
+        revealedAndUnlocked_boolBob = self.chicken_contract.revealedAndUnlocked(rec_bin(commitBob))
         self.assertFalse(revealedAndUnlocked_boolBob)
 
-        bidRecordCharlie = self.auction_contract.bidders(rec_bin(commitCharlie))
+        bidRecordCharlie = self.chicken_contract.bidders(rec_bin(commitCharlie))
         self.assertEqual(rec_hex(CHARLIE_ADDRESS), bidRecordCharlie)
-        session_dataCharlie = self.auction_contract.getSubmarineState(rec_bin(commitCharlie))
+        session_dataCharlie = self.chicken_contract.getSubmarineState(rec_bin(commitCharlie))
         self.assertListEqual(session_dataCharlie, [BID_AMOUNT_Charlie, SOLIDITY_NULL_INITIALVAL, commit_block_numberCharlie, commit_block_indexCharlie])
-        revealedAndUnlocked_boolCharlie = self.auction_contract.revealedAndUnlocked(rec_bin(commitCharlie))
+        revealedAndUnlocked_boolCharlie = self.chicken_contract.revealedAndUnlocked(rec_bin(commitCharlie))
         self.assertFalse(revealedAndUnlocked_boolCharlie)
 
         ##
@@ -601,25 +604,25 @@ class TestExampleAuction(unittest.TestCase):
         )
 
         self.assertEqual(
-            self.chain.head_state.get_balance(self.auction_contract.address),
+            self.chain.head_state.get_balance(self.chicken_contract.address),
             (BID_AMOUNT_Alice + BID_AMOUNT_Bob + BID_AMOUNT_Charlie),
             "Contract address should have the sum of the bids balance."
         )
 
 
-        session_dataAlice = self.auction_contract.getSubmarineState(rec_bin(commitAlice))
+        session_dataAlice = self.chicken_contract.getSubmarineState(rec_bin(commitAlice))
         self.assertListEqual(session_dataAlice, [BID_AMOUNT_Alice, BID_AMOUNT_Alice, commit_block_numberAlice, commit_block_indexAlice])
-        revealedAndUnlocked_boolAlice = self.auction_contract.revealedAndUnlocked(rec_bin(commitAlice))
+        revealedAndUnlocked_boolAlice = self.chicken_contract.revealedAndUnlocked(rec_bin(commitAlice))
         self.assertTrue(revealedAndUnlocked_boolAlice)
 
-        session_dataBob = self.auction_contract.getSubmarineState(rec_bin(commitBob))
+        session_dataBob = self.chicken_contract.getSubmarineState(rec_bin(commitBob))
         self.assertListEqual(session_dataBob, [BID_AMOUNT_Bob, BID_AMOUNT_Bob, commit_block_numberBob, commit_block_indexBob])
-        revealedAndUnlocked_boolBob = self.auction_contract.revealedAndUnlocked(rec_bin(commitBob))
+        revealedAndUnlocked_boolBob = self.chicken_contract.revealedAndUnlocked(rec_bin(commitBob))
         self.assertTrue(revealedAndUnlocked_boolBob)
 
-        session_dataCharlie = self.auction_contract.getSubmarineState(rec_bin(commitCharlie))
+        session_dataCharlie = self.chicken_contract.getSubmarineState(rec_bin(commitCharlie))
         self.assertListEqual(session_dataCharlie, [BID_AMOUNT_Charlie, BID_AMOUNT_Charlie, commit_block_numberCharlie, commit_block_indexCharlie])
-        revealedAndUnlocked_boolCharlie = self.auction_contract.revealedAndUnlocked(rec_bin(commitCharlie))
+        revealedAndUnlocked_boolCharlie = self.chicken_contract.revealedAndUnlocked(rec_bin(commitCharlie))
         self.assertTrue(revealedAndUnlocked_boolCharlie)
 
         ##
@@ -627,14 +630,14 @@ class TestExampleAuction(unittest.TestCase):
         ##
 
         self.chain.mine(REVEAL_PERIOD_LENGTH)
-        self.auction_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
-        self.auction_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
-        self.auction_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
 
         # ##
         # ## CHECK STATE NOW THAT AUCTION IS OVER
 
-        self.assertEqual(commitCharlie, self.auction_contract.winningSubmarineId().hex())
+        self.assertEqual(commitCharlie, self.chicken_contract.winningSubmarineId().hex())
 
         self.assertEqual(
             ACCOUNT_STARTING_BALANCE - (extraTransactionFees + BASIC_SEND_GAS_LIMIT * OURGASPRICE),
