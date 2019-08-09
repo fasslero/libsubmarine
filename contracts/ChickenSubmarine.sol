@@ -5,54 +5,66 @@ import "./openzeppelin-solidity/contracts/math/SafeMath.sol";
 import "./openzeppelin-solidity/contracts/token/ERC721/IERC721.sol";
 import "./openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol";
 
-contract ChickenSubmarine is IERC721Receiver, LibSubmarineSimple {
+contract ChickenSubmarine is LibSubmarineSimple {
     using SafeMath for uint256; //prevents overflow
-    IERC721 public erc721;
-    uint256 public erc721TokenId;
+
     
     address payable public manager;
+    bool public isInitiated;
     
     mapping (bytes32 => address payable) public players; //players[_submarineId] gives us the address of the player
     bytes32[] public revealedSubmarines;
     bytes32 public winningSubmarineId;
     bool public winnerSelected;
     
-    uint256 public minBet;
+    uint96 public minBet;
     
     uint32 public startBlock;
     uint32 public endCommitBlock;
-    /*bytes32*/uint32 public endCommitBlockCrypt;
+    bytes32 public endCommitBlockCrypt;
     uint32 public startRevealBlock;
     uint32 public endRevealBlock;
     
     
-/*    constructor(uint32 _StartBlock, uint32 _EndBlock, uint256 _MinBet, bytes32 _endCommitBlockCrypt) public {
+    constructor() public {
+        isInitiated = false;
+        winnerSelected = false; //makes sure winner is selected once within a game
+        manager = msg.sender;
+    }
+
+
+    function initChickenGame(uint32 _StartBlock, uint32 _StartRevealBlock, uint96 _MinBet, bytes32 _endCommitBlockCrypt) public {
+        require(
+            isInitiated == false, 
+            "Chicken - Contract can be initiated only once"
+        );
+        require(
+            manager == msg.sender,
+            "Chicken - Only contract creator can init Game"
+        );
         require(
             block.number < _StartBlock,
             "Chicken - Block number is greater than startBlock"
         );
         require(
-            _StartBlock < _EndBlock,
-            "Chicken - startBlock is greater than endBlock"
+            _StartBlock < _StartRevealBlock,
+            "Chicken - startBlock is greater than startRevealBlock"
         );
         require(
-            _MinBet != 0,
+            _MinBet != uint96(0),
             "Chicken - minimum bet was set to 0"
         );
-        
+
         startBlock = _StartBlock;
-        startRevealBlock = _EndBlock;
+        startRevealBlock = _StartRevealBlock;
         endRevealBlock = _StartBlock + 180; // margine for proveth, starting from start block
         
         endCommitBlockCrypt = _endCommitBlockCrypt; //promise for endCommitBlock that is > startBlock & < startRevealBlock
 
-        winnerSelected = false; //makes sure winner is selected once within a game
         minBet = _MinBet;
+    }
 
-        manager = msg.sender;
-    }*/
-
-  /// @notice This creates the auction.
+  /*/// @notice This creates the auction.
   function onERC721Received(
     address _operator,
     address _from,
@@ -62,17 +74,17 @@ contract ChickenSubmarine is IERC721Receiver, LibSubmarineSimple {
     require(address(erc721) == address(0x0));
 
     // In solidity 0.5.0, we can just do this:
-    (startBlock, startRevealBlock, minBet, endCommitBlockCrypt) = abi.decode(_data, (uint32, uint32, uint256, /*bytes32*/uint32));
+    //(startBlock, startRevealBlock, minBet, endCommitBlockCrypt) = abi.decode(_data, (uint32, uint32, uint256, bytes32));
     // For now, here is some janky assembly hack that does the same thing,
     // only less efficiently.
-    /*require(_data.length == 8);
+    require(_data.length == 8);
     bytes memory data = _data; // Copy to memory;
     uint32 tempStartBlock;
     uint32 tempEndBlock;
     assembly {
       tempStartBlock := div(mload(add(data, 32)), exp(2, 224))
       tempEndBlock := and(div(mload(add(data, 32)), exp(2, 192)), 0xffffffff)
-    }*/
+    }
 
     endRevealBlock = startBlock + 180;
 
@@ -84,7 +96,7 @@ contract ChickenSubmarine is IERC721Receiver, LibSubmarineSimple {
     manager = address(uint160(_from));
 
     return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
-  }
+  }*/
 
     function onSubmarineReveal(
         bytes32 _submarineId,
@@ -96,7 +108,7 @@ contract ChickenSubmarine is IERC721Receiver, LibSubmarineSimple {
             "Chicken - current block is not in reveal period"
         );
         require(
-            getSubmarineAmount(_submarineId) > minBet,
+            _value >= minBet,
             "Chicken - amount sent is less than minimum bet"
         ); //verify minimimum participation value
         
@@ -105,7 +117,7 @@ contract ChickenSubmarine is IERC721Receiver, LibSubmarineSimple {
     }
     
     
-    function selectWinner(uint256 _secretCommitBlock) public {
+    function selectWinner(uint32 _secretCommitBlock) public {
         require(
             msg.sender == manager,
             "Chicken - sender is not game creator"
@@ -118,14 +130,13 @@ contract ChickenSubmarine is IERC721Receiver, LibSubmarineSimple {
             winnerSelected == false,
             "Chicken - winner was initialized"
         ); //winner must be un-initialized
-        /*require(
-            keccak256(_secretCommitBlock) == endCommitBlockCrypt,
+        require(
+            keccak256(abi.encodePacked(_secretCommitBlock)) == endCommitBlockCrypt,
             "Chicken - secretCommitBlock has different hash"
-        );*/ 
+        ); 
          
         
-        // calculate endCommitBlock
-        endCommitBlock = startBlock + uint32(uint8(_secretCommitBlock));
+        endCommitBlock = _secretCommitBlock;
         // promise to reimburse money (should not enter here)
         if(endCommitBlock <= startBlock || endCommitBlock >= startRevealBlock) {
             for (uint j=0; j<revealedSubmarines.length; j++) {
