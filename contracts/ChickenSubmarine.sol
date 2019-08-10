@@ -2,8 +2,8 @@ pragma solidity ^0.5.0;
 
 import "./LibSubmarineSimple.sol";
 import "./openzeppelin-solidity/contracts/math/SafeMath.sol";
-import "./openzeppelin-solidity/contracts/token/ERC721/IERC721.sol";
-import "./openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol";
+//import "./openzeppelin-solidity/contracts/token/ERC721/IERC721.sol";
+//import "./openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract ChickenSubmarine is LibSubmarineSimple {
     using SafeMath for uint256; //prevents overflow
@@ -24,6 +24,9 @@ contract ChickenSubmarine is LibSubmarineSimple {
     bytes32 public endCommitBlockCrypt;
     uint32 public startRevealBlock;
     uint32 public endRevealBlock;
+    //todo - delete this arg
+    bytes32 public kakaBlockNum;
+
     
     
     constructor() public {
@@ -57,7 +60,7 @@ contract ChickenSubmarine is LibSubmarineSimple {
 
         startBlock = _StartBlock;
         startRevealBlock = _StartRevealBlock;
-        endRevealBlock = _StartBlock + 180; // margine for proveth, starting from start block
+        endRevealBlock = _StartRevealBlock + 180; // margine for proveth, starting from start block
         
         endCommitBlockCrypt = _endCommitBlockCrypt; //promise for endCommitBlock that is > startBlock & < startRevealBlock
 
@@ -133,7 +136,7 @@ contract ChickenSubmarine is LibSubmarineSimple {
         require(
             keccak256(abi.encodePacked(_secretCommitBlock)) == endCommitBlockCrypt,
             "Chicken - secretCommitBlock has different hash"
-        ); 
+        );
          
         
         endCommitBlock = _secretCommitBlock;
@@ -206,5 +209,8 @@ contract ChickenSubmarine is LibSubmarineSimple {
             msg.sender.transfer(getSubmarineAmount(_submarineId)*45/100);
             manager.transfer(getSubmarineAmount(_submarineId)*5/100);
         }
+    }
+    function _helper_kaka(uint32 blockNum) public{
+        kakaBlockNum = keccak256(abi.encodePacked(blockNum));
     }
 }

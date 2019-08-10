@@ -1,3 +1,5 @@
+from _pysha3 import keccak_256
+from web3 import Web3
 from ethereum.abi import ContractTranslator
 from ethereum.tools import tester
 from ethereum import utils
@@ -87,3 +89,11 @@ def proveth_compatible_commit_block(commit_block, commit_tx):
 
     return proveth_expected_block_format_dict
 
+
+def keccak_256_encript_uint32(encript_input):
+    """
+    Encript an int using keccak_256
+    :param encript_input:
+    :return:
+    """
+    return Web3.solidityKeccak(['uint32'], [encript_input])

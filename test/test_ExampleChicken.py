@@ -3,11 +3,12 @@ import os
 import rlp
 import sys
 import unittest
+
 from ethereum import config, transactions
 from ethereum.tools import tester as t
 from ethereum.utils import checksum_encode, normalize_address, sha3
-from test_utils import rec_hex, rec_bin, deploy_solidity_contract_with_args
-from eth_abi.packed import encode_single_packed
+from test_utils import rec_hex, rec_bin, deploy_solidity_contract_with_args, \
+    keccak_256_encript_uint32
 
 sys.path.append(
     os.path.join(os.path.dirname(__file__), '..', 'generate_commitment'))
@@ -20,7 +21,7 @@ import proveth
 root_repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 
 COMMIT_PERIOD_LENGTH = 20
-REVEAL_PERIOD_LENGTH = 256 # hardcoded in the auction contract...
+REVEAL_PERIOD_LENGTH = 180 # hardcoded in the auction contract...
 # internet points to you if you can figure out the references in these amounts
 BID_AMOUNT_Alice = 1337000000000000000
 BID_AMOUNT_Bob = 5555000000000000000
@@ -59,61 +60,61 @@ class TestExampleChicken(unittest.TestCase):
             os.path.join(root_repo_dir, 'contracts/'))
         os.chdir(root_repo_dir)
 
-        self.erc721_contract = deploy_solidity_contract_with_args(
-            chain=self.chain,
-            solc_config_sources={
-                'openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol')]
-                },
-                'openzeppelin-solidity/contracts/access/roles/MinterRole.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/access/roles/MinterRole.sol')]
-                },
-                'openzeppelin-solidity/contracts/access/Roles.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/access/Roles.sol')]
-                },
-                'openzeppelin-solidity/contracts/token/ERC721/ERC721.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/ERC721.sol')]
-                },
-                'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol')]
-                },
-                'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol')]
-                },
-                'openzeppelin-solidity/contracts/math/SafeMath.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/math/SafeMath.sol')]
-                },
-                'openzeppelin-solidity/contracts/utils/Address.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/utils/Address.sol')]
-                },
-                'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
-                },
-                'openzeppelin-solidity/contracts/introspection/ERC165.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/ERC165.sol')]
-                },
-                'openzeppelin-solidity/contracts/drafts/Counters.sol': {
-                    'urls':
-                    [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/drafts/Counters.sol')]
-                }
-            },
-            allow_paths=root_repo_dir,
-            contract_file='openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol',
-            contract_name='ERC721Mintable',
-            startgas=10**7,
-            args=[],
-            contract_creator=CONTRACT_OWNER_PRIVATE_KEY)
-        self.erc721_contract.mint(CONTRACT_OWNER_ADDRESS, TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY)
+        # self.erc721_contract = deploy_solidity_contract_with_args(
+        #     chain=self.chain,
+        #     solc_config_sources={
+        #         'openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/access/roles/MinterRole.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/access/roles/MinterRole.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/access/Roles.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/access/Roles.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/token/ERC721/ERC721.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/ERC721.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/math/SafeMath.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/math/SafeMath.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/utils/Address.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/utils/Address.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/introspection/ERC165.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/ERC165.sol')]
+        #         },
+        #         'openzeppelin-solidity/contracts/drafts/Counters.sol': {
+        #             'urls':
+        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/drafts/Counters.sol')]
+        #         }
+        #     },
+        #     allow_paths=root_repo_dir,
+        #     contract_file='openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol',
+        #     contract_name='ERC721Mintable',
+        #     startgas=10**7,
+        #     args=[],
+        #     contract_creator=CONTRACT_OWNER_PRIVATE_KEY)
+        # self.erc721_contract.mint(CONTRACT_OWNER_ADDRESS, TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY)
 
         self.chicken_contract = deploy_solidity_contract_with_args(
             chain=self.chain,
@@ -135,16 +136,16 @@ class TestExampleChicken(unittest.TestCase):
                 },
                 'proveth/Solidity-RLP/contracts/RLPReader.sol': {
                     'urls': [os.path.join(contract_dir, 'proveth/Solidity-RLP/contracts/RLPReader.sol')]
-                },
-                'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol': {
-                    'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol')]
-                },
-                'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol': {
-                    'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol')]
-                },
-                'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
-                    'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
                 }
+                # 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol': {
+                #     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol')]
+                # },
+                # 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol': {
+                #     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol')]
+                # },
+                # 'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
+                #     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
+                # }
                 # 'proveth/RLP.sol': {
                 #     'urls': [os.path.join(contract_dir, 'proveth/RLP.sol')]
                 # },
@@ -166,33 +167,44 @@ class TestExampleChicken(unittest.TestCase):
         starting_owner_eth_holdings = self.chain.head_state.get_balance(rec_hex(CONTRACT_OWNER_ADDRESS))
         self.chain.mine(1)
 
-        self.assertTrue(self.erc721_contract.isMinter(CONTRACT_OWNER_ADDRESS))
+        #self.assertTrue(self.erc721_contract.isMinter(CONTRACT_OWNER_ADDRESS))
         self.chain.mine(1)
-        self.assertEqual(1, self.erc721_contract.balanceOf(rec_hex(CONTRACT_OWNER_ADDRESS), sender=CONTRACT_OWNER_PRIVATE_KEY))
-        self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.erc721_contract.ownerOf(TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY))
+        # self.assertEqual(1, self.erc721_contract.balanceOf(rec_hex(CONTRACT_OWNER_ADDRESS), sender=CONTRACT_OWNER_PRIVATE_KEY))
+        # self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.erc721_contract.ownerOf(TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY))
 
+        # validate initial balance
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
+        # Validate the contract is deploied
         self.assertTrue(self.chicken_contract.address)
         self.assertEqual(27, self.chicken_contract.vee())
 
         ##
         ## START THE AUCTION
-        ## (By sending the token to the auction contract, triggering onERC721Received)
         startAuctionBlock = self.chain.head_state.block_number + 1
-        endCommitPeriodBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
+        startRevealBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
         minBet = 10
-        endCommitBlockCrypt = COMMIT_PERIOD_LENGTH
-        onERC721RecievedDataField = encode_single_packed('(uint32,uint32,uint256,uint32)', [startAuctionBlock, endCommitPeriodBlock, minBet, endCommitBlockCrypt])
-        self.erc721_contract.safeTransferFrom(CONTRACT_OWNER_ADDRESS, self.chicken_contract.address, TOKEN_ID, onERC721RecievedDataField, sender=CONTRACT_OWNER_PRIVATE_KEY)
-        self.assertEqual(rec_hex(self.chicken_contract.address), self.erc721_contract.ownerOf(TOKEN_ID))
-        self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.chicken_contract.seller())
+        endCommitBlockRaw = startRevealBlock - 1
+        endCommitBlockCrypt = keccak_256_encript_uint32(endCommitBlockRaw)
+
+        self.chicken_contract.initChickenGame(rec_bin(startAuctionBlock),
+                                              rec_bin(startRevealBlock),
+                                              rec_bin(minBet),
+                                              endCommitBlockCrypt,
+                                              sender=CONTRACT_OWNER_PRIVATE_KEY)
+
+        # validate chicken game initiated
+        self.assertEqual(endCommitBlockCrypt, self.chicken_contract.endCommitBlockCrypt())
+        self.assertEqual(minBet, self.chicken_contract.minBet())
+        self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.chicken_contract.manager())
         self.assertEqual(startAuctionBlock, self.chicken_contract.startBlock())
-        self.assertEqual(endCommitPeriodBlock, self.chicken_contract.endCommitBlock())
-        self.assertEqual(endCommitPeriodBlock+REVEAL_PERIOD_LENGTH, self.chicken_contract.endRevealBlock())
-        self.assertEqual(TOKEN_ID, self.chicken_contract.erc721TokenId())
-        self.assertEqual(rec_hex(self.erc721_contract.address), self.chicken_contract.erc721())
+        self.assertEqual(startRevealBlock, self.chicken_contract.startRevealBlock())
+        self.assertEqual(startRevealBlock+REVEAL_PERIOD_LENGTH, self.chicken_contract.endRevealBlock())
+        self.assertEqual(False, self.chicken_contract.isInitiated())
+        self.assertEqual(False, self.chicken_contract.winnerSelected())
+        self.assertEqual(64*'0', self.chicken_contract.winningSubmarineId().hex())
+
 
         #
         # GENERATE UNLOCK TXs
@@ -536,21 +548,21 @@ class TestExampleChicken(unittest.TestCase):
         ##
         ## CHECK THE STATE AFTER REVEAL
         ##
-        bidRecordAlice = self.chicken_contract.bidders(rec_bin(commitAlice))
+        bidRecordAlice = self.chicken_contract.players(rec_bin(commitAlice))
         self.assertEqual(rec_hex(ALICE_ADDRESS), bidRecordAlice)
         session_dataAlice = self.chicken_contract.getSubmarineState(rec_bin(commitAlice))
         self.assertListEqual(session_dataAlice, [BID_AMOUNT_Alice, SOLIDITY_NULL_INITIALVAL, commit_block_numberAlice, commit_block_indexAlice])
         revealedAndUnlocked_boolAlice = self.chicken_contract.revealedAndUnlocked(rec_bin(commitAlice))
         self.assertFalse(revealedAndUnlocked_boolAlice)
 
-        bidRecordBob = self.chicken_contract.bidders(rec_bin(commitBob))
+        bidRecordBob = self.chicken_contract.players(rec_bin(commitBob))
         self.assertEqual(rec_hex(BOB_ADDRESS), bidRecordBob)
         session_dataBob = self.chicken_contract.getSubmarineState(rec_bin(commitBob))
         self.assertListEqual(session_dataBob, [BID_AMOUNT_Bob, SOLIDITY_NULL_INITIALVAL, commit_block_numberBob, commit_block_indexBob])
         revealedAndUnlocked_boolBob = self.chicken_contract.revealedAndUnlocked(rec_bin(commitBob))
         self.assertFalse(revealedAndUnlocked_boolBob)
 
-        bidRecordCharlie = self.chicken_contract.bidders(rec_bin(commitCharlie))
+        bidRecordCharlie = self.chicken_contract.players(rec_bin(commitCharlie))
         self.assertEqual(rec_hex(CHARLIE_ADDRESS), bidRecordCharlie)
         session_dataCharlie = self.chicken_contract.getSubmarineState(rec_bin(commitCharlie))
         self.assertListEqual(session_dataCharlie, [BID_AMOUNT_Charlie, SOLIDITY_NULL_INITIALVAL, commit_block_numberCharlie, commit_block_indexCharlie])
@@ -625,11 +637,25 @@ class TestExampleChicken(unittest.TestCase):
         revealedAndUnlocked_boolCharlie = self.chicken_contract.revealedAndUnlocked(rec_bin(commitCharlie))
         self.assertTrue(revealedAndUnlocked_boolCharlie)
 
-        ##
-        ## END AUCTION
-        ##
-
+        ###############
+        # Select winner
+        ###############
         self.chain.mine(REVEAL_PERIOD_LENGTH)
+
+        self.chicken_contract._helper_kaka(endCommitBlockRaw)
+        self.chain.mine(1)
+
+        kakaBlockNum = self.chicken_contract.kakaBlockNum()
+
+        self.chicken_contract.selectWinner(rec_bin(endCommitBlockRaw),
+                                           sender=CONTRACT_OWNER_PRIVATE_KEY)
+        self.chain.mine(1)
+        self.assertTrue(self.chicken_contract.winnerSelected())
+        self.assertEqual(commitCharlie, self.chicken_contract.winningSubmarineId().hex())
+
+        #####################
+        # END AUCTION
+        #####################
         self.chicken_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
         self.chicken_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
         self.chicken_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
