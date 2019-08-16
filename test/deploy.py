@@ -24,7 +24,7 @@ def main():
     acct = w3.eth.account.privateKeyToAccount(private_key)
 
     # compile your smart contract with truffle first
-    truffleFile = json.load(open('./contracts/compiled_contracts/ChickenSubmarine.json'))
+    truffleFile = json.load(open('../contracts/compiled_contracts/ChickenSubmarine.json'))
     abi = truffleFile['abi']
     bytecode = truffleFile['bytecode']
     contract = w3.eth.contract(bytecode=bytecode, abi=abi)
@@ -50,7 +50,7 @@ def main():
     contract_data = {"address": contract.address,
                      "bytecode": contract.bytecode.hex(),
                      "abi": list(contract.abi)}
-    file_name = f"./contracts/deployed_contracts/{contract.address}.json"
+    file_name = f"../contracts/deployed_contracts/{contract.address}.json"
     with open(file_name, 'w+') as json_file:
         json.dump(contract_data, json_file)
 
