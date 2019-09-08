@@ -57,14 +57,14 @@ def _get_args():
 
 class ChickenGame:
 
-    def __init__(self, infura, private_key, gas, gas_price):
+    def __init__(self, infura, private_key, gas, gas_price, game_json_path):
         self.gas = gas
         self.gas_price = gas_price
         self.w3 = Web3(HTTPProvider(infura))
         assert self.w3.isConnected(), f"Connection problem to infura at {infura}"
         self.owner_account = self.w3.eth.account.privateKeyToAccount(private_key)
         # compile your smart contract with truffle first
-        truffleFile = json.load(open('./contracts/compiled_contracts/ChickenSubmarine.json'))
+        truffleFile = json.load(open(game_json_path))
         self.abi = truffleFile['abi']
         self.bytecode = truffleFile['bytecode']
         self.contract = self.w3.eth.contract(bytecode=self.bytecode, abi=self.abi)
@@ -110,7 +110,7 @@ class ChickenGame:
         contract_data = {"address": self.contract.address,
                          "bytecode": self.contract.bytecode.hex(),
                          "abi": list(self.contract.abi)}
-        file_name = f"./contracts/deployed_contracts/{self.contract.address}.json"
+        file_name = f"../contracts/deployed_contracts/{self.contract.address}.json"
         with open(file_name, 'w+') as json_file:
             json.dump(contract_data, json_file)
 
