@@ -13,7 +13,7 @@ from generate_commitment.generate_submarine_commit import generateCommitAddress
 from test_chicken.test_utils import keccak_256_encript_uint32, generate_proof_blob, rec_bin, rec_hex
 
 OURGASLIMIT = 8000000
-OURGASPRICE = 20**9
+OURGASPRICE = 25*(10**9)
 BASIC_SEND_GAS_LIMIT = OURGASLIMIT
 REVEAL_GAS_LIMIT = OURGASLIMIT
 SELECT_WIN_GAS_LIMIT = OURGASLIMIT
@@ -93,7 +93,7 @@ class Player:
         signed_tx = self.user_account.signTransaction(tx_dict)
         log.info(f"Send {amount_in_wei} wei to submarine {self.submarin_address_b}")
         tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        self.submarine_tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash)
+        self.submarine_tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
 
         if self.submarine_tx_receipt is None:
             return {'status': 'failed', 'error': 'timeout'}
@@ -117,13 +117,13 @@ class Player:
             buildTransaction({
                               'chainId': CHAIN_ID,
                               'gas': REVEAL_GAS_LIMIT,
-                              'gasPrice': OURGASPRICE,
+                              'gasPrice': OURGASPRICE * 2,
                               'nonce': nonce})
 
         log.info("Send reveal transaction")
         signed_reveal_tx = self.user_account.signTransaction(reveal_tx_dict)
         reveal_tx_hash = self.w3.eth.sendRawTransaction(signed_reveal_tx.rawTransaction)
-        self.reveal_tx_receipt = self.w3.eth.waitForTransactionReceipt(reveal_tx_hash)
+        self.reveal_tx_receipt = self.w3.eth.waitForTransactionReceipt(reveal_tx_hash, timeout=720)
 
         if self.reveal_tx_receipt is None:
             log.info(f"Reveal transaction failed")
@@ -133,7 +133,7 @@ class Player:
         log.info(f"send unlock transaction")
 
         unlock_tx_hash = self.w3.eth.sendRawTransaction(self.submarine_unlock_tx)
-        self.reveal_tx_receipt = self.w3.eth.waitForTransactionReceipt(unlock_tx_hash)
+        self.reveal_tx_receipt = self.w3.eth.waitForTransactionReceipt(unlock_tx_hash, timeout=720)
 
     def finalize(self):
         """
@@ -150,7 +150,7 @@ class Player:
 
         signed_tx = self.user_account.signTransaction(tx_dict)
         tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash)
+        tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
 
         if tx_receipt is None:
             log.info("finalize call failed")
