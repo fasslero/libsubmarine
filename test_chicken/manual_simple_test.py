@@ -81,11 +81,12 @@ def basic_positive_flow():
     log.info(f"boris bet res is {boris_bet_res} at block num ~ {boris_current_block}")
 
     # wait for reveal period
-    log.info("Wait for reveal period to start")
+    log.info("Wait for reveal period to start, and Boris's commit to be 20 blocks old")
     start_reveal_period = game.get_start_reveal_block()
-    while game.w3.eth.blockNumber < start_reveal_period + 2:
-        log.info(f"current block {game.w3.eth.blockNumber} is before start reveal block + 2 {start_reveal_period + 2}")
-        sleep(1)
+    while game.w3.eth.blockNumber <= start_reveal_period and game.w3.eth.blockNumber <= boris_current_block + 20:
+        log.info(f"current block {game.w3.eth.blockNumber} is before start reveal block + 2 {start_reveal_period + 2} \
+        or before Boris's time {boris_current_block + 20}")
+        sleep(2)
 
     # reveal the players
     log.info(f"Reveal both players")
