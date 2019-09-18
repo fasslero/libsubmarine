@@ -6,9 +6,9 @@ from web3.contract import ConciseContract
 
 from test_chicken.test_utils import keccak_256_encript_uint32
 
-OURGASLIMIT = 3712394
-OURGASPRICE = 10**9
-CHAIN_ID = 42    # mainNet = 1 | Ropsten = 3 | Rinkeby = 4 | Goerli = 5 | Kovan = 42
+OURGASLIMIT = 8000000
+OURGASPRICE = 20**9
+CHAIN_ID = 3    # mainNet = 1 | Ropsten = 3 | Rinkeby = 4 | Goerli = 5 | Kovan = 42
 BORIS_INFURA = "https://kovan.infura.io/v3/6a78ce7bbca14f73a8644c43eed4d2af"
 OFER_INFURA = "https://kovan.infura.io/v3/b275be83f34b419bbdb7f4920e9a1d2e"
 # <Private Key here with 0x prefix>
@@ -96,7 +96,7 @@ class ChickenGame:
         signed = self.owner_account.signTransaction(construct_txn)
 
         self.tx_hash = self.w3.eth.sendRawTransaction(signed.rawTransaction)
-        print(self.tx_hash.hex())
+        print(f"game hash is: {self.tx_hash.hex()}")
         self.tx_receipt = self.w3.eth.waitForTransactionReceipt(self.tx_hash)
         assert self.tx_receipt.status == 1, \
             f"{self.tx_hash.hex()} failed, receipt status should be 1, please check on etherscan.io"
@@ -133,7 +133,7 @@ class ChickenGame:
         signed_tx = self.owner_account.signTransaction(tx_dict)
         tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
         tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash)
-
+        print(f"Init game tx receipt is {tx_receipt}")
         if tx_receipt is None:
             return {'status': 'failed', 'error': 'timeout'}
         return {'status': 'added', 'processed_receipt': tx_receipt}

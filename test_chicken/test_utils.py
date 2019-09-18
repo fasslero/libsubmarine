@@ -108,46 +108,16 @@ def generate_proof_blob(player):
     Generate proof blob for this player in this game
     """
     src_address = player.user_account.address
-    commit_tx_object = player.submarine_commit
+    #commit_tx_object = player.submarine_commit
     commit_block_number = player.submarine_tx_receipt.get("blockNumber")
-    commit_block_object = player.w3.getBlock(commit_block_number)
-    proveth_expected_block_format_dict = dict()
+    commit_block_object = player.w3.eth.getBlock(commit_block_number, full_transactions=True)
+    proveth_expected_block_format_dict = dict(commit_block_object)
 
     # record all the data in the desired format
-    proveth_expected_block_format_dict['parentHash'] = commit_block_object['prevhash']
-    proveth_expected_block_format_dict['sha3Uncles'] = commit_block_object['uncles_hash']
-    proveth_expected_block_format_dict['miner'] = commit_block_object['coinbase']
-    proveth_expected_block_format_dict['stateRoot'] = commit_block_object['state_root']
-    proveth_expected_block_format_dict['transactionsRoot'] = commit_block_object['tx_list_root']
-    proveth_expected_block_format_dict['receiptsRoot'] = commit_block_object['receipts_root']
-    proveth_expected_block_format_dict['logsBloom'] = commit_block_object['bloom']
-    proveth_expected_block_format_dict['difficulty'] = commit_block_object['difficulty']
-    proveth_expected_block_format_dict['number'] = commit_block_object['number']
-    proveth_expected_block_format_dict['gasLimit'] = commit_block_object['gas_limit']
-    proveth_expected_block_format_dict['gasUsed'] = commit_block_object['gas_used']
-    proveth_expected_block_format_dict['timestamp'] = commit_block_object['timestamp']
-    proveth_expected_block_format_dict['extraData'] = commit_block_object['extra_data']
-    proveth_expected_block_format_dict['mixHash'] = commit_block_object['mixhash']
-    proveth_expected_block_format_dict['nonce'] = commit_block_object['nonce']
-    proveth_expected_block_format_dict['hash'] = commit_block_object.hash
-    proveth_expected_block_format_dict['uncles'] = []
-    proveth_expected_block_format_dict['transactions'] = \
-        ({
-            "blockHash": commit_block_object.hash,
-            "blockNumber": str(hex((commit_block_object['number']))),
-            "from": checksum_encode(src_address),
-            "gas": str(hex(commit_tx_object['startgas'])),
-            "gasPrice": str(hex(commit_tx_object['gasprice'])),
-            "hash": rec_hex(commit_tx_object['hash']),
-            "input": rec_hex(commit_tx_object['data']),
-            "nonce": str(hex(commit_tx_object['nonce'])),
-            "to": checksum_encode(commit_tx_object['to']),
-            "transactionIndex": str(hex(0)),
-            "value": str(hex(commit_tx_object['value'])),
-            "v": str(hex(commit_tx_object['v'])),
-            "r": str(hex(commit_tx_object['r'])),
-            "s": str(hex(commit_tx_object['s']))
-         },)
+    #proveth_expected_block_format_dict.pop("sealFields")
+    # todo - there is no mixed hash and nonce, we think its in the seal fields field
+    #proveth_expected_block_format_dict['mixHash'] = commit_block_object.sealFields[0]
+    #proveth_expected_block_format_dict['nonce'] = commit_block_object.sealFields[1]
 
     return proveth.generate_proof_blob(proveth_expected_block_format_dict,
                                        player.submarine_tx_receipt.get("transactionIndex"))
