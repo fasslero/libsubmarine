@@ -22,7 +22,7 @@ game_json_path = os.path.abspath(game_json)
 
 
 def create_game():
-    game = ChickenGame(OFER_INFURA, OFER_KEY, 6092664, 21, game_json_path)
+    game = ChickenGame(BORIS_INFURA, BORIS_KEY, 6092664, 21, game_json_path)
     print(f"Created a chicken game obj {game}")
     return game
 
@@ -42,8 +42,8 @@ def create_boris_player(game):
 
 def basic_positive_flow():
     game = create_game()
-    ofer_bet = 1500000
-    boris_bet = 2500000
+    ofer_bet = 50000000000
+    boris_bet = 150000000000
 
     log.info(f"Created a chicken game obj {game.__repr__()}")
 
@@ -67,31 +67,37 @@ def basic_positive_flow():
         log.info(f"current block {game.w3.eth.blockNumber} is before start game {current_block + 10}")
         sleep(2)
 
-    ofer_current_block = game.w3.eth.blockNumber
-    log.info(f"Create submarine with ofer's bet of {ofer_bet} on block {ofer_current_block}")
-    ofer_bet_res = ofer_player.send_ether_to_submarine(ofer_bet)
-    log.info(f"Ofer bet res is {ofer_bet_res} at block num ~ {ofer_current_block}")
-
-    log.info("Sleep for 15 seconds")
-    sleep(15)
-
     boris_current_block = game.w3.eth.blockNumber
     log.info(f"Create submarine with Boris's bet of {boris_bet} on block {boris_current_block}")
     boris_bet_res = boris_player.send_ether_to_submarine(boris_bet)
     log.info(f"boris bet res is {boris_bet_res} at block num ~ {boris_current_block}")
 
+    log.info("Wait for one block")
+    current_block = game.w3.eth.blockNumber
+    while game.w3.eth.blockNumber < current_block + 1:
+        log.info(f"current block {game.w3.eth.blockNumber} wait for block {current_block + 1}")
+        sleep(2)
+
+    ofer_current_block = game.w3.eth.blockNumber
+    log.info(f"Create submarine with ofer's bet of {ofer_bet} on block {ofer_current_block}")
+    ofer_bet_res = ofer_player.send_ether_to_submarine(ofer_bet)
+    log.info(f"Ofer bet res is {ofer_bet_res} at block num ~ {ofer_current_block}")
+
+
     # wait for reveal period
-    log.info("Wait for reveal period to start, and Boris's commit to be 20 blocks old")
+    log.info("Wait for reveal period to start, and Boris's commit to be 30 blocks old")
     start_reveal_period = game.get_start_reveal_block()
-    while game.w3.eth.blockNumber <= start_reveal_period and game.w3.eth.blockNumber <= boris_current_block + 20:
-        log.info(f"current block {game.w3.eth.blockNumber} is before start reveal block + 2 {start_reveal_period + 2} \
-        or before Boris's time {boris_current_block + 20}")
+    while game.w3.eth.blockNumber <= start_reveal_period or game.w3.eth.blockNumber <= boris_current_block + 30:
+        log.info(f"current block {game.w3.eth.blockNumber} is before start reveal block + 2 {start_reveal_period + 2} "
+                 f"or before Boris's time {boris_current_block + 30}")
         sleep(2)
 
     # reveal the players
-    log.info(f"Reveal both players")
-    ofer_reveal_res = ofer_player.submarine_reveal_and_unlock()
+
+    log.info(f"Reveal boris player")
     boris_reveal_res = boris_player.submarine_reveal_and_unlock()
+    log.info(f"Reveal ofer player")
+    ofer_reveal_res = ofer_player.submarine_reveal_and_unlock()
 
     log.info(f"Boris reveal and unlock result: {boris_reveal_res}")
     log.info(f"Ofer reveal and unlock result: {ofer_reveal_res}")
@@ -112,3 +118,6 @@ def basic_positive_flow():
 if __name__ == "__main__":
     basic_positive_flow()
 
+
+def _wait_for_block(block_number):
+    pass

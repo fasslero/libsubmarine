@@ -13,7 +13,6 @@ from generate_commitment.generate_submarine_commit import generateCommitAddress
 from test_chicken.test_utils import keccak_256_encript_uint32, generate_proof_blob, rec_bin, rec_hex
 
 OURGASLIMIT = 8000000
-OURGASPRICE = 25*(10**9)
 BASIC_SEND_GAS_LIMIT = OURGASLIMIT
 REVEAL_GAS_LIMIT = OURGASLIMIT
 SELECT_WIN_GAS_LIMIT = OURGASLIMIT
@@ -49,6 +48,8 @@ class Player:
         self.w3 = Web3(HTTPProvider(infura_url))
         assert self.w3.isConnected(), f"Infura connection problem at {infura_url}"
         self.user_account = self.w3.eth.account.privateKeyToAccount(self.private_key)
+        self.ourgasprice = 50000000000
+        self.submarine_basic_cash = 250000000000000000
         self.game_obj = game_obj
         self.game_contract = game_obj.contract
         self.game_address = game_obj.contract.address
@@ -75,25 +76,11 @@ class Player:
             generateCommitAddress(rec_bin(self.user_account.address),
                                   rec_bin(self.game_address),
                                   amount_in_wei, b"",
-                                  OURGASPRICE, BASIC_SEND_GAS_LIMIT)
+                                  self.ourgasprice, BASIC_SEND_GAS_LIMIT)
 
-        nonce = self.w3.eth.getTransactionCount(self.user_account.address)
         # Save for the reveal
         self.bet_amount_in_wei = amount_in_wei
-
-        tx_dict = {
-            'to': rec_bin(self.submarin_address_b),
-            'value': amount_in_wei,
-            'gas': BASIC_SEND_GAS_LIMIT,
-            'gasPrice': OURGASPRICE,
-            'nonce': nonce,
-            'chainId': CHAIN_ID
-        }
-
-        signed_tx = self.user_account.signTransaction(tx_dict)
-        log.info(f"Send {amount_in_wei} wei to submarine {self.submarin_address_b}")
-        tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        self.submarine_tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
+        self.submarine_tx_receipt = self.send_wei_to_submarine(self.submarine_basic_cash)
 
         if self.submarine_tx_receipt is None:
             return {'status': 'failed', 'error': 'timeout'}
@@ -104,9 +91,9 @@ class Player:
         Send submarine reveal to the game contract
         """
         commit_tx_block_num = self.submarine_tx_receipt.blockNumber
-        nonce = self.w3.eth.getTransactionCount(self.user_account.address)
         proof_blob = generate_proof_blob(self)
         self._unlock_tx_unsigned_rlp()
+        nonce = self.w3.eth.getTransactionCount(self.user_account.address)
 
         reveal_tx_dict = self.game_contract.functions.reveal(
             commit_tx_block_num,
@@ -117,7 +104,7 @@ class Player:
             buildTransaction({
                               'chainId': CHAIN_ID,
                               'gas': REVEAL_GAS_LIMIT,
-                              'gasPrice': OURGASPRICE * 2,
+                              'gasPrice': self.ourgasprice * 2,
                               'nonce': nonce})
 
         log.info("Send reveal transaction")
@@ -130,10 +117,21 @@ class Player:
             return {'status': 'failed', 'error': 'timeout'}
         log.info(f"Reveal transaction was sent: {self.reveal_tx_receipt}")
 
-        log.info(f"send unlock transaction")
+        sent_flag = False
+        iteration_number = 0
+        while iteration_number < 4 and not sent_flag:
+            try:
+                log.info(f"send unlock transaction")
+                unlock_tx_hash = self.w3.eth.sendRawTransaction(self.submarine_unlock_tx)
+                sent_flag = True
+            except ValueError as e:
+                log.info(f"Unlock failed with massage: {e}")
+                iteration_number += 1
+                submarine_tx_receipt = self.send_wei_to_submarine(self.submarine_basic_cash)
+                log.info(f"Submarine tx receipt is :{submarine_tx_receipt}")
 
-        unlock_tx_hash = self.w3.eth.sendRawTransaction(self.submarine_unlock_tx)
         self.reveal_tx_receipt = self.w3.eth.waitForTransactionReceipt(unlock_tx_hash, timeout=720)
+        return self.reveal_tx_receipt
 
     def finalize(self):
         """
@@ -144,7 +142,7 @@ class Player:
         tx_dict = self.game_contract.functions.finalize(rec_bin(self.submarine_commit)).buildTransaction({
             'chainId': CHAIN_ID,
             'gas': FINALIZE_GAS_LIMIT,
-            'gasPrice': OURGASPRICE,
+            'gasPrice': self.ourgasprice,
             'nonce': nonce,
         })
 
@@ -170,3 +168,18 @@ class Player:
         )
 
         self.unlock_tx_unsigned_rlp = rlp.encode(self.unlock_tx_unsigned_object, transactions.UnsignedTransaction)
+
+    def send_wei_to_submarine(self, amount_in_wei):
+        tx_dict = {
+            'to': rec_bin(self.submarin_address_b),
+            'value': amount_in_wei,
+            'gas': BASIC_SEND_GAS_LIMIT,
+            'gasPrice': self.ourgasprice,
+            'nonce': self.w3.eth.getTransactionCount(self.user_account.address),
+            'chainId': CHAIN_ID
+        }
+
+        signed_tx = self.user_account.signTransaction(tx_dict)
+        log.info(f"Send {amount_in_wei} wei to submarine {self.submarin_address_b}")
+        tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
+        return self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)

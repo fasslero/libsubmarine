@@ -6,8 +6,6 @@ from web3.contract import ConciseContract
 
 from test_chicken.test_utils import keccak_256_encript_uint32
 
-OURGASLIMIT = 8000000
-OURGASPRICE = 25*(10**9)
 CHAIN_ID = 3    # mainNet = 1 | Ropsten = 3 | Rinkeby = 4 | Goerli = 5 | Kovan = 42
 BORIS_INFURA = "https://kovan.infura.io/v3/6a78ce7bbca14f73a8644c43eed4d2af"
 OFER_INFURA = "https://kovan.infura.io/v3/b275be83f34b419bbdb7f4920e9a1d2e"

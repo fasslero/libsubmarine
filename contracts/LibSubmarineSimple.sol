@@ -35,7 +35,7 @@ contract LibSubmarineSimple is ProvethVerifier {
     // For now, we choose a default of 20. Since a contract cannot look back
     // further than 256 blocks (limit comes from EVM BLOCKHASH opcode), we use a
     // uint8.
-    uint8 public commitPeriodLength = 20;
+    uint8 public commitPeriodLength = 5;
 
     // Stored "session" state information
     mapping(bytes32 => SubmarineSession) public sessions;

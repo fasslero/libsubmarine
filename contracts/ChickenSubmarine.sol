@@ -60,7 +60,7 @@ contract ChickenSubmarine is LibSubmarineSimple {
 
         startBlock = _StartBlock;
         startRevealBlock = _StartRevealBlock;
-        endRevealBlock = _StartRevealBlock + 180; // margine for proveth, starting from start block
+        endRevealBlock = _StartRevealBlock + 30; // margine for proveth, starting from start block
         
         endCommitBlockCrypt = _endCommitBlockCrypt; //promise for endCommitBlock that is > startBlock & < startRevealBlock
 
