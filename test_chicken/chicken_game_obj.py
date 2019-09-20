@@ -1,5 +1,6 @@
 import argparse
 import json
+import logging
 import sys
 from web3 import Web3, HTTPProvider
 from web3.contract import ConciseContract
@@ -12,6 +13,7 @@ OFER_INFURA = "https://kovan.infura.io/v3/b275be83f34b419bbdb7f4920e9a1d2e"
 # <Private Key here with 0x prefix>
 BORIS_KEY = "0xbdf5bd75f8907a1f5a34d3b1b4fddb047d4cdd71203f3301b5f230dfc1cffa7a"
 OFER_KEY = "0x3B1533A9E1E80FF558BB6708F71DA1397DB10C3F590A43E19917ED55CD5D9591"
+log = logging.getLogger('SubmarineCommitGenerator')
 
 
 def _get_args():
@@ -68,6 +70,8 @@ class ChickenGame:
         self.contract = self.w3.eth.contract(bytecode=self.bytecode, abi=self.abi)
         self.tx_hash = None
         self.tx_receipt = None
+        self.init_tx_receipt = None
+        self.select_winner_tx_receipt = None
         self.contract_transaction = None
         self.contract_block_number = None
 
@@ -94,21 +98,21 @@ class ChickenGame:
         signed = self.owner_account.signTransaction(construct_txn)
 
         self.tx_hash = self.w3.eth.sendRawTransaction(signed.rawTransaction)
-        print(f"game hash is: {self.tx_hash.hex()}")
+        log.info(f"game hash is: {self.tx_hash.hex()}")
         self.tx_receipt = self.w3.eth.waitForTransactionReceipt(self.tx_hash, timeout=720)
         assert self.tx_receipt.status == 1, \
             f"{self.tx_hash.hex()} failed, receipt status should be 1, please check on etherscan.io"
 
-        print("Contract Deployed At:", self.tx_receipt['contractAddress'])
+        log.info("Contract Deployed At:", self.tx_receipt['contractAddress'])
         self.contract = self.w3.eth.contract(address=self.tx_receipt['contractAddress'],
                                              bytecode=self.bytecode,
                                              abi=self.abi)
 
-        # write contract data to file
         contract_data = {"address": self.contract.address,
                          "bytecode": self.contract.bytecode.hex(),
                          "abi": list(self.contract.abi)}
         file_name = f"../contracts/deployed_contracts/{self.contract.address}.json"
+        log.info(f"write contract data to file {file_name}")
         with open(file_name, 'w+') as json_file:
             json.dump(contract_data, json_file)
 
@@ -120,6 +124,8 @@ class ChickenGame:
         """
         end_commit_block_crypt = keccak_256_encript_uint32(end_commit_block)
         nonce = self.w3.eth.getTransactionCount(self.owner_account.address)
+
+        log.info(f"init chicken game")
         tx_dict = self.contract.functions.initChickenGame(
             start_block, start_reveal_block, min_bet, end_commit_block_crypt).\
             buildTransaction({
@@ -130,11 +136,10 @@ class ChickenGame:
 
         signed_tx = self.owner_account.signTransaction(tx_dict)
         tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
-        print(f"Init game tx receipt is {tx_receipt}")
-        if tx_receipt is None:
-            return {'status': 'failed', 'error': 'timeout'}
-        return {'status': 'added', 'processed_receipt': tx_receipt}
+        self.init_tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
+
+        log.info(f"Init game tx receipt is {self.init_tx_receipt}")
+        return self.init_tx_receipt
 
     def select_winner(self, end_commit_block):
         """
@@ -150,13 +155,13 @@ class ChickenGame:
                               'gasPrice': self.w3.toWei(self.gas_price, 'gwei'),
                               'nonce': nonce})
 
+        log.info(f"Select winner transaction")
         signed_tx = self.owner_account.signTransaction(tx_dict)
         tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
+        self.select_winner_tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
 
-        if tx_receipt is None:
-            return {'status': 'failed', 'error': 'timeout'}
-        return {'status': 'added', 'processed_receipt': tx_receipt}
+        log.info(f"Select winner tx receipt is {self.select_winner_tx_receipt}")
+        return self.select_winner_tx_receipt
 
     #################
     # CONTRACT CALLS

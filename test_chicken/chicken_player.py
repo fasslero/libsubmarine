@@ -17,9 +17,10 @@ BASIC_SEND_GAS_LIMIT = OURGASLIMIT
 REVEAL_GAS_LIMIT = OURGASLIMIT
 SELECT_WIN_GAS_LIMIT = OURGASLIMIT
 FINALIZE_GAS_LIMIT = OURGASLIMIT
-CHAIN_ID = 3    # mainNet = 1 | Ropsten = 3 | Rinkeby = 4 | Goerli = 5 | Kovan = 42
+CHAIN_ID = 3  # mainNet = 1 | Ropsten = 3 | Rinkeby = 4 | Goerli = 5 | Kovan = 42
 
 log = logging.getLogger('SubmarineCommitGenerator')
+
 
 # web3.py instance
 # w3 = Web3(HTTPProvider("https://kovan.infura.io/v3/6a78ce7bbca14f73a8644c43eed4d2af"))
@@ -27,10 +28,10 @@ log = logging.getLogger('SubmarineCommitGenerator')
 
 
 # private_key = "0xbdf5bd75f8907a1f5a34d3b1b4fddb047d4cdd71203f3301b5f230dfc1cffa7a" #"<Private Key here with 0x prefix>"
-#user_account = w3.eth.account.privateKeyToAccount(private_key)
+# user_account = w3.eth.account.privateKeyToAccount(private_key)
 
-#wallet_private_key = [WALLET_PRIVATE_KEY]
-#wallet_address = [WALLET_ADDRESS]
+# wallet_private_key = [WALLET_PRIVATE_KEY]
+# wallet_address = [WALLET_ADDRESS]
 
 # load deployed contract
 # truffleFile = json.load(open('../contracts/deployed_contracts/ChickenSubmarine.json'))
@@ -38,7 +39,7 @@ log = logging.getLogger('SubmarineCommitGenerator')
 # bytecode = truffleFile['bytecode']
 # contract_address = truffleFile['address']
 # contract = w3.eth.contract(address=contract_address, bytecode=bytecode, abi=abi)
-#contract_ = w3.eth.contract(abi=contract_interface['abi'], bytecode=contract_interface['bin'])
+# contract_ = w3.eth.contract(abi=contract_interface['abi'], bytecode=contract_interface['bin'])
 
 
 class Player:
@@ -59,6 +60,8 @@ class Player:
         self.submarine_unlock_tx = None
         self.submarine_tx_receipt = None
         self.reveal_tx_receipt = None
+        self.unlock_tx_receipt = None
+        self.finalize_tx_receipt = None
         self.bet_amount_in_wei = None
 
     ############################
@@ -82,9 +85,8 @@ class Player:
         self.bet_amount_in_wei = amount_in_wei
         self.submarine_tx_receipt = self.send_wei_to_submarine(self.submarine_basic_cash)
 
-        if self.submarine_tx_receipt is None:
-            return {'status': 'failed', 'error': 'timeout'}
-        return{'status': 'added', 'tx_receipt': self.submarine_tx_receipt}
+        log.info(f"Send ether transaction receipt: {self.submarine_tx_receipt}")
+        return {'status': 'added', 'tx_receipt': self.submarine_tx_receipt}
 
     def submarine_reveal_and_unlock(self):
         """
@@ -100,12 +102,12 @@ class Player:
             b'',  # unlock extra data - we have none
             rec_bin(self.submarine_witness),
             self.unlock_tx_unsigned_rlp,
-            proof_blob).\
+            proof_blob). \
             buildTransaction({
-                              'chainId': CHAIN_ID,
-                              'gas': REVEAL_GAS_LIMIT,
-                              'gasPrice': self.ourgasprice * 2,
-                              'nonce': nonce})
+            'chainId': CHAIN_ID,
+            'gas': REVEAL_GAS_LIMIT,
+            'gasPrice': self.ourgasprice * 2,
+            'nonce': nonce})
 
         log.info("Send reveal transaction")
         signed_reveal_tx = self.user_account.signTransaction(reveal_tx_dict)
@@ -130,8 +132,10 @@ class Player:
                 submarine_tx_receipt = self.send_wei_to_submarine(self.submarine_basic_cash)
                 log.info(f"Submarine tx receipt is :{submarine_tx_receipt}")
 
-        self.reveal_tx_receipt = self.w3.eth.waitForTransactionReceipt(unlock_tx_hash, timeout=720)
-        return self.reveal_tx_receipt
+        self.unlock_tx_receipt = self.w3.eth.waitForTransactionReceipt(unlock_tx_hash, timeout=720)
+
+        log.info(f"Unlock transaction receipt: {self.unlock_tx_receipt}")
+        return {'status': 'added', 'tx_receipt': self.unlock_tx_receipt}
 
     def finalize(self):
         """
@@ -145,14 +149,13 @@ class Player:
             'gasPrice': self.ourgasprice,
             'nonce': nonce,
         })
-
+        log.info(f"Send finalize transaction")
         signed_tx = self.user_account.signTransaction(tx_dict)
         tx_hash = self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-        tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
+        self.finalize_tx_receipt = self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=720)
 
-        if tx_receipt is None:
-            log.info("finalize call failed")
-        log.info({'status': 'added', 'processed_receipt': tx_receipt})
+        log.info({'status': 'added', 'processed_receipt': self.finalize_tx_receipt})
+        return self.finalize_tx_receipt
 
     def _unlock_tx_unsigned_rlp(self):
         unlock_tx_info = rlp.decode(rec_bin(self.submarine_unlock_tx))
