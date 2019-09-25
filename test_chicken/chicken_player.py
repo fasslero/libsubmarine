@@ -120,17 +120,25 @@ class Player:
         log.info(f"Reveal transaction was sent: {self.reveal_tx_receipt}")
 
         sent_flag = False
-        iteration_number = 0
-        while iteration_number < 4 and not sent_flag:
-            try:
-                log.info(f"send unlock transaction")
-                unlock_tx_hash = self.w3.eth.sendRawTransaction(self.submarine_unlock_tx)
-                sent_flag = True
-            except ValueError as e:
-                log.info(f"Unlock failed with massage: {e}")
-                iteration_number += 1
-                submarine_tx_receipt = self.send_wei_to_submarine(self.submarine_basic_cash)
-                log.info(f"Submarine tx receipt is :{submarine_tx_receipt}")
+        iteration_number = 1
+        try:
+            log.info(f"send unlock transaction")
+            unlock_tx_hash = self.w3.eth.sendRawTransaction(self.submarine_unlock_tx)
+            sent_flag = True
+        except ValueError as e:
+            log.info(f"First Unlock failed with massage: {e}")
+            while iteration_number < 5 and not sent_flag:
+                try:
+                    log.info(f"Send more {self.submarine_basic_cash} Wei to submarine")
+                    submarine_tx_receipt = self.send_wei_to_submarine(self.submarine_basic_cash)
+                    log.info(f"Send wei tx receipt is :{submarine_tx_receipt}")
+                    log.info(f"Send unlock transaction for the {iteration_number +1} time")
+                    unlock_tx_hash = self.w3.eth.sendRawTransaction(self.submarine_unlock_tx)
+                    sent_flag = True
+                except ValueError as e:
+                    iteration_number += 1
+                    log.info(f"iteration number - {iteration_number} - "
+                             f"Unlock or send eth to submarine failed with massage: {e}")
 
         self.unlock_tx_receipt = self.w3.eth.waitForTransactionReceipt(unlock_tx_hash, timeout=720)
 

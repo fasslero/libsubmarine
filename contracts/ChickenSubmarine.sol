@@ -2,33 +2,45 @@ pragma solidity ^0.5.0;
 
 import "./LibSubmarineSimple.sol";
 import "./openzeppelin-solidity/contracts/math/SafeMath.sol";
-//import "./openzeppelin-solidity/contracts/token/ERC721/IERC721.sol";
-//import "./openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol";
 
 contract ChickenSubmarine is LibSubmarineSimple {
     using SafeMath for uint256; //prevents overflow
 
-    
+    /////////////
+    // Storage //
+    /////////////
+
+    // The owner of the contract and the creator of the current game
     address payable public manager;
-    bool public isInitiated;
-    
-    mapping (bytes32 => address payable) public players; //players[_submarineId] gives us the address of the player
+    // Stores player information. players[_submarineId] gives us the address of the player
+    mapping (bytes32 => address) public players;
+    // Stores the revealed Submarine IDs
     bytes32[] public revealedSubmarines;
+    // Stores the winning Submarine ID after selecting the winner
     bytes32 public winningSubmarineId;
+    // Flag for monitoring if a winner was selected
     bool public winnerSelected;
-    
+
+    // Stores the minimum bet in Wei for participating in the game
     uint96 public minBet;
-    
+    // Stores the block number of when the game starts
     uint32 public startBlock;
+    // Stores the selected block number to for the final valid commit in the game,
+    // revealed only after initiating SelectWinner
     uint32 public endCommitBlock;
+    //Stores the end commit block hash crypt in keccak256
     bytes32 public endCommitBlockCrypt;
+    // Stores the block number of the beginning of the reveal period
     uint32 public startRevealBlock;
+    // Stores the block number for the last valid reveal in the game, hardcoded to startRevealBlock + 30
     uint32 public endRevealBlock;
-    //todo - delete this arg
+    // TODO - delete this param
     bytes32 public kakaBlockNum;
 
-    
-    
+
+    /**
+     * @notice The constructor for deploying a new Chicken game with no parameters
+     */
     constructor() public {
         isInitiated = false;
         winnerSelected = false; //makes sure winner is selected once within a game
@@ -36,9 +48,16 @@ contract ChickenSubmarine is LibSubmarineSimple {
     }
 
 
+    /**
+     * @notice The init function to instantiating a deployed Chicken game
+     * @param  _StartBlock The block number from which the game begins and a valid commit can be placed
+     * @param  _MinBet The minimum amount in Wei a player must commit to a submarine
+     * @param  _endCommitBlockCrypt The end commit block number from which the players cannot commit
+                new submarines and the reveal period starts hashed using keccak256
+     */
     function initChickenGame(uint32 _StartBlock, uint32 _StartRevealBlock, uint96 _MinBet, bytes32 _endCommitBlockCrypt) public {
         require(
-            isInitiated == false, 
+            isInitiated == false,
             "Chicken - Contract can be initiated only once"
         );
         require(
@@ -60,47 +79,21 @@ contract ChickenSubmarine is LibSubmarineSimple {
 
         startBlock = _StartBlock;
         startRevealBlock = _StartRevealBlock;
-        endRevealBlock = _StartRevealBlock + 30; // margine for proveth, starting from start block
-        
+        endRevealBlock = _StartRevealBlock + 30; // margine for proveth
+
         endCommitBlockCrypt = _endCommitBlockCrypt; //promise for endCommitBlock that is > startBlock & < startRevealBlock
 
         minBet = _MinBet;
     }
 
-  /*/// @notice This creates the auction.
-  function onERC721Received(
-    address _operator,
-    address _from,
-    uint256 _tokenId,
-    bytes memory _data
-  ) public returns(bytes4) {
-    require(address(erc721) == address(0x0));
 
-    // In solidity 0.5.0, we can just do this:
-    //(startBlock, startRevealBlock, minBet, endCommitBlockCrypt) = abi.decode(_data, (uint32, uint32, uint256, bytes32));
-    // For now, here is some janky assembly hack that does the same thing,
-    // only less efficiently.
-    require(_data.length == 8);
-    bytes memory data = _data; // Copy to memory;
-    uint32 tempStartBlock;
-    uint32 tempEndBlock;
-    assembly {
-      tempStartBlock := div(mload(add(data, 32)), exp(2, 224))
-      tempEndBlock := and(div(mload(add(data, 32)), exp(2, 192)), 0xffffffff)
-    }
-
-    endRevealBlock = startBlock + 180;
-
-    require(block.number < startBlock);
-    require(startBlock < startRevealBlock);
-    require(minBet != uint256(0));
-    erc721 = IERC721(msg.sender);
-    erc721TokenId = _tokenId;
-    manager = address(uint160(_from));
-
-    return bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"));
-  }*/
-
+    /**
+     * @notice onSubmarineReveal implements the game logic for a reveal action made by a player.
+     *         Revealer's address & submarine Id are stored in the contract.
+     * @param  _submarineId the ID for this submarine workflow
+     * @param  _embeddedDAppData unused variable in our game logic
+     * @param  _value unused variable in our game logic (we use getSubmarineAmount(_submarineId) instead)
+     */
     function onSubmarineReveal(
         bytes32 _submarineId,
         bytes memory _embeddedDAppData,
@@ -113,13 +106,18 @@ contract ChickenSubmarine is LibSubmarineSimple {
         require(
             _value >= minBet,
             "Chicken - amount sent is less than minimum bet"
-        ); //verify minimimum participation value
-        
+        ); //verify minimum participation value
+
         players[_submarineId] = msg.sender;
         revealedSubmarines.push(_submarineId);
     }
-    
-    
+
+
+    /**
+     * @notice selectWinner is used only by the game's manager.
+     *  Winner is selected from within all valid participants after choosing the end of the valid commit period.
+     *  Winner Submarine Id is then stored in the contract
+     */
     function selectWinner(uint32 _secretCommitBlock) public {
         require(
             msg.sender == manager,
@@ -137,8 +135,8 @@ contract ChickenSubmarine is LibSubmarineSimple {
             keccak256(abi.encodePacked(_secretCommitBlock)) == endCommitBlockCrypt,
             "Chicken - secretCommitBlock has different hash"
         );
-         
-        
+
+
         endCommitBlock = _secretCommitBlock;
         // promise to reimburse money (should not enter here)
         if(endCommitBlock <= startBlock || endCommitBlock >= startRevealBlock) {
@@ -149,12 +147,12 @@ contract ChickenSubmarine is LibSubmarineSimple {
                 }
             }
         }
-        
-        uint32 closestBlockTime = startBlock;
+
         //select the winner
+        uint32 closestBlockTime = startBlock;
         for (uint i=0; i<revealedSubmarines.length; i++) {
             uint32 commitTxBlockNumber = getSubmarineCommitBlockNumber(revealedSubmarines[i]);
-            
+
             if (startBlock <= commitTxBlockNumber && commitTxBlockNumber <= endCommitBlock) {
                 //closest to endCommitBlock wins
                 if (commitTxBlockNumber > closestBlockTime) {
@@ -170,11 +168,16 @@ contract ChickenSubmarine is LibSubmarineSimple {
                 }
             }
         }
-        
+
         winnerSelected = true;
     }
-    
-    
+
+
+    /**
+     * @notice finalize is called by each player to check whether he is the selected winner
+     *  and receive the winner's reward or to receive a partial reimbursement of the participation fee
+     * @param _submarineId the ID for this submarine workflow
+     */
     function finalize(bytes32 _submarineId) external {
         require(
             block.number > endRevealBlock,
@@ -196,10 +199,10 @@ contract ChickenSubmarine is LibSubmarineSimple {
             players[_submarineId] == msg.sender,
             "Chicken - sender is not owner of submarine"
         );
-    
+
         if (winningSubmarineId == bytes32(0) || _submarineId == winningSubmarineId) {
             //send money to winner | or to every participant if no winner was selected
-            //send commition to manager
+            //send commission to the manager
             msg.sender.transfer(getSubmarineAmount(_submarineId)*95/100);
             manager.transfer(getSubmarineAmount(_submarineId)*5/100);
         } else {

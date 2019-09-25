@@ -103,7 +103,7 @@ class ChickenGame:
         assert self.tx_receipt.status == 1, \
             f"{self.tx_hash.hex()} failed, receipt status should be 1, please check on etherscan.io"
 
-        log.info("Contract Deployed At:", self.tx_receipt['contractAddress'])
+        log.info(f"Contract Deployed At: {self.tx_receipt['contractAddress']}")
         self.contract = self.w3.eth.contract(address=self.tx_receipt['contractAddress'],
                                              bytecode=self.bytecode,
                                              abi=self.abi)
@@ -192,7 +192,7 @@ class ChickenGame:
         return self.contract.functions.isInitiated().call()
 
     def get_winner_selected(self):
-        return self.contract.functions.winnerSelected().cal()
+        return self.contract.functions.winnerSelected().call()
 
     def get_winning_submarine_id(self):
         return self.contract.functions.winningSubmarineId().call()

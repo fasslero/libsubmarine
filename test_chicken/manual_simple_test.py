@@ -40,6 +40,12 @@ def create_boris_player(game):
     return player_boris
 
 
+def wait_for_block(game, block_number, massage):
+    while game.w3.eth.blockNumber <= block_number:
+        log.info(f"{massage} - current block {game.w3.eth.blockNumber} wait for block {block_number}")
+        sleep(2)
+
+
 def basic_positive_flow():
     game = create_game()
     ofer_bet = 50000000000
@@ -54,8 +60,8 @@ def basic_positive_flow():
     log.info(f"Current block number is {current_block}")
 
     start_block = current_block + 10
-    end_commit_block = current_block + 10
-    start_reveal_block = end_commit_block + 10
+    end_commit_block = start_block + 15
+    start_reveal_block = end_commit_block + 2
 
     res = game.init_chicken_game(start_block=start_block,
                                  start_reveal_block=start_reveal_block,
@@ -66,7 +72,7 @@ def basic_positive_flow():
     ofer_player = create_ofer_player(game)
     boris_player = create_boris_player(game)
 
-    _wait_for_block(game, start_block, "wait for game to start")
+    wait_for_block(game, start_block, "wait for game to start")
 
     boris_current_block = game.w3.eth.blockNumber
     log.info(f"Create submarine with Boris's bet of {boris_bet} on block {boris_current_block}")
@@ -74,7 +80,7 @@ def basic_positive_flow():
     log.info(f"boris bet res is {boris_bet_res} at block num ~ {boris_current_block}")
 
     current_block = game.w3.eth.blockNumber
-    _wait_for_block(game, current_block+1, "Wait for one block to separate the bets")
+    wait_for_block(game, current_block + 1, "Wait for one block to separate the bets")
 
     ofer_current_block = game.w3.eth.blockNumber
     log.info(f"Create submarine with ofer's bet of {ofer_bet} on block {ofer_current_block}")
@@ -83,7 +89,7 @@ def basic_positive_flow():
 
     # wait for reveal period
     start_reveal_period = game.get_start_reveal_block()
-    _wait_for_block(game, start_reveal_period, "Wait for reveal period to start, and Boris's commit to be 30 blocks old")
+    wait_for_block(game, start_reveal_period, "Wait for reveal period to start")
 
     # reveal the players
     log.info(f"Reveal Boris player")
@@ -95,7 +101,7 @@ def basic_positive_flow():
     log.info(f"Ofer reveal and unlock result: {ofer_reveal_res}")
 
     # choose winner
-    _wait_for_block(game, game.get_end_reveal_block() + 1, "wait for end reveal block + 1")
+    wait_for_block(game, game.get_end_reveal_block() + 1, "wait for end reveal block + 1")
     res = game.select_winner(end_commit_block)
     log.info(f"Select winner ended with {res}")
 
@@ -110,10 +116,3 @@ def basic_positive_flow():
 
 if __name__ == "__main__":
     basic_positive_flow()
-
-
-def _wait_for_block(game, block_number, massage):
-    while game.w3.eth.blockNumber <= block_number:
-        log.info(f"{massage}")
-        log.info(f"current block {game.w3.eth.blockNumber} wait for block {block_number}")
-        sleep(2)
