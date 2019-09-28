@@ -7,7 +7,9 @@ import unittest
 from ethereum import config, transactions
 from ethereum.tools import tester as t
 from ethereum.utils import checksum_encode, normalize_address, sha3
-from test_utils import rec_hex, rec_bin, deploy_solidity_contract_with_args, \
+
+from proveth.offchain.proveth import generate_proof_blob
+from test_chicken.test_utils import rec_hex, rec_bin, deploy_solidity_contract_with_args, \
     keccak_256_encript_uint32
 
 sys.path.append(
@@ -21,8 +23,7 @@ import proveth
 root_repo_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../'))
 
 COMMIT_PERIOD_LENGTH = 20
-REVEAL_PERIOD_LENGTH = 180 # hardcoded in the auction contract...
-# internet points to you if you can figure out the references in these amounts
+REVEAL_PERIOD_LENGTH = 30  # hardcoded in the auction contract...
 BID_AMOUNT_Alice = 1337000000000000000
 BID_AMOUNT_Bob = 5555000000000000000
 BID_AMOUNT_Charlie = 8675309000000000000
@@ -60,62 +61,6 @@ class TestExampleChicken(unittest.TestCase):
             os.path.join(root_repo_dir, 'contracts/'))
         os.chdir(root_repo_dir)
 
-        # self.erc721_contract = deploy_solidity_contract_with_args(
-        #     chain=self.chain,
-        #     solc_config_sources={
-        #         'openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/access/roles/MinterRole.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/access/roles/MinterRole.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/access/Roles.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/access/Roles.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/token/ERC721/ERC721.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/ERC721.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/math/SafeMath.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/math/SafeMath.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/utils/Address.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/utils/Address.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/introspection/ERC165.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/ERC165.sol')]
-        #         },
-        #         'openzeppelin-solidity/contracts/drafts/Counters.sol': {
-        #             'urls':
-        #             [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/drafts/Counters.sol')]
-        #         }
-        #     },
-        #     allow_paths=root_repo_dir,
-        #     contract_file='openzeppelin-solidity/contracts/token/ERC721/ERC721Mintable.sol',
-        #     contract_name='ERC721Mintable',
-        #     startgas=10**7,
-        #     args=[],
-        #     contract_creator=CONTRACT_OWNER_PRIVATE_KEY)
-        # self.erc721_contract.mint(CONTRACT_OWNER_ADDRESS, TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY)
-
         self.chicken_contract = deploy_solidity_contract_with_args(
             chain=self.chain,
             solc_config_sources={
@@ -137,18 +82,6 @@ class TestExampleChicken(unittest.TestCase):
                 'proveth/Solidity-RLP/contracts/RLPReader.sol': {
                     'urls': [os.path.join(contract_dir, 'proveth/Solidity-RLP/contracts/RLPReader.sol')]
                 }
-                # 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol': {
-                #     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721.sol')]
-                # },
-                # 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol': {
-                #     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/token/ERC721/IERC721Receiver.sol')]
-                # },
-                # 'openzeppelin-solidity/contracts/introspection/IERC165.sol': {
-                #     'urls': [os.path.join(contract_dir, 'openzeppelin-solidity/contracts/introspection/IERC165.sol')]
-                # }
-                # 'proveth/RLP.sol': {
-                #     'urls': [os.path.join(contract_dir, 'proveth/RLP.sol')]
-                # },
             },
             allow_paths=root_repo_dir,
             contract_file='ChickenSubmarine.sol',
@@ -163,14 +96,7 @@ class TestExampleChicken(unittest.TestCase):
         ## STARTING STATE
         ##
 
-        starting_block_height = self.chain.head_state.block_number
-        starting_owner_eth_holdings = self.chain.head_state.get_balance(rec_hex(CONTRACT_OWNER_ADDRESS))
         self.chain.mine(1)
-
-        #self.assertTrue(self.erc721_contract.isMinter(CONTRACT_OWNER_ADDRESS))
-        self.chain.mine(1)
-        # self.assertEqual(1, self.erc721_contract.balanceOf(rec_hex(CONTRACT_OWNER_ADDRESS), sender=CONTRACT_OWNER_PRIVATE_KEY))
-        # self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.erc721_contract.ownerOf(TOKEN_ID, sender=CONTRACT_OWNER_PRIVATE_KEY))
 
         # validate initial balance
         self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
@@ -181,14 +107,14 @@ class TestExampleChicken(unittest.TestCase):
         self.assertEqual(27, self.chicken_contract.vee())
 
         ##
-        ## START THE AUCTION
-        startAuctionBlock = self.chain.head_state.block_number + 1
+        ## START THE GAME
+        startChickenBlock = self.chain.head_state.block_number + 1
         startRevealBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
         minBet = 10
         endCommitBlockRaw = startRevealBlock - 1
         endCommitBlockCrypt = keccak_256_encript_uint32(endCommitBlockRaw)
 
-        self.chicken_contract.initChickenGame(rec_bin(startAuctionBlock),
+        self.chicken_contract.initChickenGame(rec_bin(startChickenBlock),
                                               rec_bin(startRevealBlock),
                                               rec_bin(minBet),
                                               endCommitBlockCrypt,
@@ -198,7 +124,7 @@ class TestExampleChicken(unittest.TestCase):
         self.assertEqual(endCommitBlockCrypt, self.chicken_contract.endCommitBlockCrypt())
         self.assertEqual(minBet, self.chicken_contract.minBet())
         self.assertEqual(rec_hex(CONTRACT_OWNER_ADDRESS), self.chicken_contract.manager())
-        self.assertEqual(startAuctionBlock, self.chicken_contract.startBlock())
+        self.assertEqual(startChickenBlock, self.chicken_contract.startBlock())
         self.assertEqual(startRevealBlock, self.chicken_contract.startRevealBlock())
         self.assertEqual(startRevealBlock+REVEAL_PERIOD_LENGTH, self.chicken_contract.endRevealBlock())
         self.assertEqual(False, self.chicken_contract.isInitiated())
@@ -392,7 +318,7 @@ class TestExampleChicken(unittest.TestCase):
             "s":                  str(hex(commit_tx_objectAlice['s']))
         }, )
 
-        commit_proof_blobAlice = proveth.generate_proof_blob(
+        commit_proof_blobAlice = generate_proof_blob(
             proveth_expected_block_format_dictAlice, commit_block_indexAlice)
         _unlockExtraData = b''  # In this example we dont have any extra embedded data as part of the unlock TX
 
@@ -455,7 +381,7 @@ class TestExampleChicken(unittest.TestCase):
             "s":                  str(hex(commit_tx_objectBob['s']))
         }, )
 
-        commit_proof_blobBob = proveth.generate_proof_blob(
+        commit_proof_blobBob = generate_proof_blob(
             proveth_expected_block_format_dictBob, commit_block_indexBob)
         _unlockExtraData = b''  # In this example we dont have any extra embedded data as part of the unlock TX
 
@@ -518,7 +444,7 @@ class TestExampleChicken(unittest.TestCase):
             "s":                  str(hex(commit_tx_objectCharlie['s']))
         }, )
 
-        commit_proof_blobCharlie = proveth.generate_proof_blob(
+        commit_proof_blobCharlie = generate_proof_blob(
             proveth_expected_block_format_dictCharlie, commit_block_indexCharlie)
         _unlockExtraData = b''  # In this example we dont have any extra embedded data as part of the unlock TX
 
@@ -665,20 +591,807 @@ class TestExampleChicken(unittest.TestCase):
 
         self.assertEqual(commitCharlie, self.chicken_contract.winningSubmarineId().hex())
 
-        self.assertEqual(
-            ACCOUNT_STARTING_BALANCE - (extraTransactionFees + BASIC_SEND_GAS_LIMIT * OURGASPRICE),
-            self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
+    def test_highest_bidder(self):
+        """
+        Test game with all players place bet at the same block
+        1. Create game and player
+        2. Place al bets at the same block
+        3. reveal and unlock all the submarines
+        4. Select winner and finalize the game
+        5. Validate the winner is the highest bidder
+        """
 
-        self.assertEqual(
-            ACCOUNT_STARTING_BALANCE - (extraTransactionFees + BASIC_SEND_GAS_LIMIT * OURGASPRICE),
-            self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
+        self.chain.mine(1)
+        # validate initial balance
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
+        # Validate the contract is deploied
+        self.assertTrue(self.chicken_contract.address)
+        self.assertEqual(27, self.chicken_contract.vee())
 
-        self.assertEqual(
-            ACCOUNT_STARTING_BALANCE - (BID_AMOUNT_Charlie + extraTransactionFees + BASIC_SEND_GAS_LIMIT * OURGASPRICE),
-            self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
+        #################
+        ## START THE GAME
+        #################
+        startChickenBlock = self.chain.head_state.block_number + 1
+        startRevealBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
+        minBet = 10
+        endCommitBlockRaw = startRevealBlock - 1
+        endCommitBlockCrypt = keccak_256_encript_uint32(endCommitBlockRaw)
 
-        self.assertEqual(starting_owner_eth_holdings + BID_AMOUNT_Charlie, self.chain.head_state.get_balance(rec_hex(CONTRACT_OWNER_ADDRESS)))
+        log.info(f"Init game with start block {startChickenBlock} and end block {endCommitBlockRaw}")
+        self.chicken_contract.initChickenGame(rec_bin(startChickenBlock),
+                                              rec_bin(startRevealBlock),
+                                              rec_bin(minBet),
+                                              endCommitBlockCrypt,
+                                              sender=CONTRACT_OWNER_PRIVATE_KEY)
 
+        ##################
+        # GENERATE UNLOCK TXs
+        ##################
+        log.info(f"Generate commit address and unlock transaction for Alice")
+
+        commitAddressAlice, commitAlice, witnessAlice, unlock_tx_hexAlice = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(ALICE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            BID_AMOUNT_Alice, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoAlice = rlp.decode(rec_bin(unlock_tx_hexAlice))
+        unlock_tx_objectAlice = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoAlice)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressBob, commitBob, witnessBob, unlock_tx_hexBob = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(BOB_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            BID_AMOUNT_Bob, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoBob = rlp.decode(rec_bin(unlock_tx_hexBob))
+        unlock_tx_objectBob = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoBob)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressCharlie, commitCharlie, witnessCharlie, unlock_tx_hexCharlie = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(CHARLIE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            BID_AMOUNT_Charlie, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoCharlie = rlp.decode(rec_bin(unlock_tx_hexCharlie))
+        unlock_tx_objectCharlie = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoCharlie)
+
+        ###################################
+        # GENERATE + BROADCAST COMMIT TXs
+        ###################################
+
+        log.info(f"Send all submarines at the same block")
+
+        commit_tx_objectAlice = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressAlice),
+            (BID_AMOUNT_Alice + extraTransactionFees),
+            b'').sign(ALICE_PRIVATE_KEY)
+
+        commit_tx_objectBob = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressBob),
+            (BID_AMOUNT_Bob + extraTransactionFees),
+            b'').sign(BOB_PRIVATE_KEY)
+
+        commit_tx_objectCharlie = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressCharlie),
+            (BID_AMOUNT_Charlie + extraTransactionFees),
+            b'').sign(CHARLIE_PRIVATE_KEY)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(commit_tx_objectAlice)
+        self.chain.direct_tx(commit_tx_objectBob)
+        self.chain.direct_tx(commit_tx_objectCharlie)
+        self.chain.mine(1)
+
+
+        #####################################################
+        ## GENERATE AND BROADCAST REVEAL BID TXS
+        #####################################################
+        log.info(f"Fast forward to reveal period")
+        self.chain.mine(COMMIT_PERIOD_LENGTH + 1)
+
+        ## GENERATE Prof blobs
+        log.info(f"Generate all proof blobs")
+        commit_block_numberAlice, commit_block_indexAlice = self.chain.chain.get_tx_position(commit_tx_objectAlice)
+        commit_block_numberBob, commit_block_indexBob = self.chain.chain.get_tx_position(commit_tx_objectBob)
+        commit_block_numberCharlie, commit_block_indexCharlie = self.chain.chain.get_tx_position(commit_tx_objectCharlie)
+
+        commit_proof_blobAlice = self._generate_proof_block_wrapper(
+            commit_block_numberAlice, commit_block_indexAlice, commit_tx_objectAlice, ALICE_ADDRESS)
+        commit_proof_blobBob = self._generate_proof_block_wrapper(
+            commit_block_numberBob, commit_block_indexBob, commit_tx_objectBob, BOB_ADDRESS)
+        commit_proof_blobCharlie = self._generate_proof_block_wrapper(
+            commit_block_numberCharlie, commit_block_indexCharlie, commit_tx_objectCharlie, CHARLIE_ADDRESS)
+
+        log.info(f"Generate unsigned tx for reveal")
+        unlock_tx_unsigned_rlpAlice = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoAlice)
+        unlock_tx_unsigned_rlpBob = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoBob)
+        unlock_tx_unsigned_rlpCharlie = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoCharlie)
+        _unlockExtraData = b''
+
+        log.info(f"Send Alice reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberAlice,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessAlice),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpAlice,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobAlice,  # bytes _proofBlob
+            sender=ALICE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Bob reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberBob,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessBob),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpBob,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobBob,  # bytes _proofBlob
+            sender=BOB_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Charlie reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberCharlie,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessCharlie),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpCharlie,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobCharlie,  # bytes _proofBlob
+            sender=CHARLIE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        ####################################
+        ## BROADCAST UNLOCK
+        ####################################
+
+        log.info(f"Broadcast unlock for all players")
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectAlice)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectBob)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectCharlie)
+        self.chain.mine(1)
+
+        #################################################
+        # Select winner
+        #################################################
+        log.info(f"Fast forward to the end of reveal period and select winner")
+        self.chain.mine(REVEAL_PERIOD_LENGTH)
+        self.chicken_contract.selectWinner(rec_bin(endCommitBlockRaw),sender=CONTRACT_OWNER_PRIVATE_KEY)
+        self.chain.mine(1)
+        self.assertTrue(self.chicken_contract.winnerSelected())
+
+        log.info(f"Validate Charlie is the winner")
+        self.assertEqual(commitCharlie, self.chicken_contract.winningSubmarineId().hex())
+
+        #######################################################
+        # END GAME
+        #######################################################
+        log.info(f"finalize game by all players")
+        self.chicken_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
+
+    def test_first_revealer(self):
+        """
+        Test game with all players place bet at the same block
+        1. Create game and player
+        2. Place al bets at the same block with the same bet amount
+        3. reveal and unlock all the submarines
+        4. Select winner and finalize the game
+        5. Validate the winner is the first revealer
+        """
+        SAME_BID_AMOUNT = BID_AMOUNT_Alice
+        self.chain.mine(1)
+        # validate initial balance
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
+        # Validate the contract is deploied
+        self.assertTrue(self.chicken_contract.address)
+        self.assertEqual(27, self.chicken_contract.vee())
+
+        #################
+        ## START THE GAME
+        #################
+        startChickenBlock = self.chain.head_state.block_number + 1
+        startRevealBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
+        minBet = 10
+        endCommitBlockRaw = startRevealBlock - 1
+        endCommitBlockCrypt = keccak_256_encript_uint32(endCommitBlockRaw)
+
+        log.info(f"Init game with start block {startChickenBlock} and end block {endCommitBlockRaw}")
+        self.chicken_contract.initChickenGame(rec_bin(startChickenBlock),
+                                              rec_bin(startRevealBlock),
+                                              rec_bin(minBet),
+                                              endCommitBlockCrypt,
+                                              sender=CONTRACT_OWNER_PRIVATE_KEY)
+
+        ##################
+        # GENERATE UNLOCK TXs
+        ##################
+        log.info(f"Generate commit address and unlock transaction for Alice")
+
+        commitAddressAlice, commitAlice, witnessAlice, unlock_tx_hexAlice = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(ALICE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            SAME_BID_AMOUNT, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoAlice = rlp.decode(rec_bin(unlock_tx_hexAlice))
+        unlock_tx_objectAlice = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoAlice)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressBob, commitBob, witnessBob, unlock_tx_hexBob = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(BOB_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            SAME_BID_AMOUNT, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoBob = rlp.decode(rec_bin(unlock_tx_hexBob))
+        unlock_tx_objectBob = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoBob)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressCharlie, commitCharlie, witnessCharlie, unlock_tx_hexCharlie = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(CHARLIE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            SAME_BID_AMOUNT, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoCharlie = rlp.decode(rec_bin(unlock_tx_hexCharlie))
+        unlock_tx_objectCharlie = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoCharlie)
+
+        ###################################
+        # GENERATE + BROADCAST COMMIT TXs
+        ###################################
+
+        log.info(f"Send all submarines at the same block with the same bid amount = {SAME_BID_AMOUNT}")
+
+        commit_tx_objectAlice = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressAlice),
+            (SAME_BID_AMOUNT + extraTransactionFees),
+            b'').sign(ALICE_PRIVATE_KEY)
+
+        commit_tx_objectBob = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressBob),
+            (SAME_BID_AMOUNT + extraTransactionFees),
+            b'').sign(BOB_PRIVATE_KEY)
+
+        commit_tx_objectCharlie = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressCharlie),
+            (SAME_BID_AMOUNT + extraTransactionFees),
+            b'').sign(CHARLIE_PRIVATE_KEY)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(commit_tx_objectAlice)
+        self.chain.direct_tx(commit_tx_objectBob)
+        self.chain.direct_tx(commit_tx_objectCharlie)
+        self.chain.mine(1)
+
+
+        #####################################################
+        ## GENERATE AND BROADCAST REVEAL BID TXS
+        #####################################################
+        log.info(f"Fast forward to reveal period")
+        self.chain.mine(COMMIT_PERIOD_LENGTH + 1)
+
+        ## GENERATE Prof blobs
+        log.info(f"Generate all proof blobs")
+        commit_block_numberAlice, commit_block_indexAlice = self.chain.chain.get_tx_position(commit_tx_objectAlice)
+        commit_block_numberBob, commit_block_indexBob = self.chain.chain.get_tx_position(commit_tx_objectBob)
+        commit_block_numberCharlie, commit_block_indexCharlie = self.chain.chain.get_tx_position(commit_tx_objectCharlie)
+
+        commit_proof_blobAlice = self._generate_proof_block_wrapper(
+            commit_block_numberAlice, commit_block_indexAlice, commit_tx_objectAlice, ALICE_ADDRESS)
+        commit_proof_blobBob = self._generate_proof_block_wrapper(
+            commit_block_numberBob, commit_block_indexBob, commit_tx_objectBob, BOB_ADDRESS)
+        commit_proof_blobCharlie = self._generate_proof_block_wrapper(
+            commit_block_numberCharlie, commit_block_indexCharlie, commit_tx_objectCharlie, CHARLIE_ADDRESS)
+
+        log.info(f"Generate unsigned tx for reveal")
+        unlock_tx_unsigned_rlpAlice = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoAlice)
+        unlock_tx_unsigned_rlpBob = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoBob)
+        unlock_tx_unsigned_rlpCharlie = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoCharlie)
+        _unlockExtraData = b''
+
+        log.info(f"Send Alice reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberAlice,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessAlice),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpAlice,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobAlice,  # bytes _proofBlob
+            sender=ALICE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Bob reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberBob,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessBob),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpBob,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobBob,  # bytes _proofBlob
+            sender=BOB_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Charlie reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberCharlie,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessCharlie),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpCharlie,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobCharlie,  # bytes _proofBlob
+            sender=CHARLIE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        ####################################
+        ## BROADCAST UNLOCK
+        ####################################
+
+        log.info(f"Broadcast unlock for all players")
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectAlice)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectBob)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectCharlie)
+        self.chain.mine(1)
+
+        #################################################
+        # Select winner
+        #################################################
+        log.info(f"Fast forward to the end of reveal period and select winner")
+        self.chain.mine(REVEAL_PERIOD_LENGTH)
+        self.chicken_contract.selectWinner(rec_bin(endCommitBlockRaw), sender=CONTRACT_OWNER_PRIVATE_KEY)
+        self.chain.mine(1)
+        self.assertTrue(self.chicken_contract.winnerSelected())
+
+        log.info(f"Validate ALICE is the winner")
+        self.assertEqual(commitAlice, self.chicken_contract.winningSubmarineId().hex())
+
+        #######################################################
+        # END GAME
+        #######################################################
+        log.info(f"finalize game by all players")
+        self.chicken_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
+
+    def test_one_player_off(self):
+        """
+        Test game one player place bet after commit period and before reveal period
+        1. Create game and player
+        2. Place two bets in the commit period and another one after
+        3. reveal and unlock all the submarines
+        4. Select winner and finalize the game
+        5. Validate the bob is the winner
+        """
+
+        self.chain.mine(1)
+        # validate initial balance
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
+        # Validate the contract is deploied
+        self.assertTrue(self.chicken_contract.address)
+        self.assertEqual(27, self.chicken_contract.vee())
+
+        #################
+        ## START THE GAME
+        #################
+        startChickenBlock = self.chain.head_state.block_number + 1
+        startRevealBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
+        minBet = 10
+        endCommitBlockRaw = startRevealBlock - 10
+        endCommitBlockCrypt = keccak_256_encript_uint32(endCommitBlockRaw)
+
+        log.info(f"Init game with start block {startChickenBlock} and end commit block {endCommitBlockRaw}")
+        self.chicken_contract.initChickenGame(rec_bin(startChickenBlock),
+                                              rec_bin(startRevealBlock),
+                                              rec_bin(minBet),
+                                              endCommitBlockCrypt,
+                                              sender=CONTRACT_OWNER_PRIVATE_KEY)
+
+        ##################
+        # GENERATE UNLOCK TXs
+        ##################
+        log.info(f"Generate commit address and unlock transaction for Alice")
+
+        commitAddressAlice, commitAlice, witnessAlice, unlock_tx_hexAlice = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(ALICE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            BID_AMOUNT_Alice, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoAlice = rlp.decode(rec_bin(unlock_tx_hexAlice))
+        unlock_tx_objectAlice = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoAlice)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressBob, commitBob, witnessBob, unlock_tx_hexBob = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(BOB_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            BID_AMOUNT_Bob, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoBob = rlp.decode(rec_bin(unlock_tx_hexBob))
+        unlock_tx_objectBob = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoBob)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressCharlie, commitCharlie, witnessCharlie, unlock_tx_hexCharlie = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(CHARLIE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            BID_AMOUNT_Charlie, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoCharlie = rlp.decode(rec_bin(unlock_tx_hexCharlie))
+        unlock_tx_objectCharlie = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoCharlie)
+
+        ###################################
+        # GENERATE + BROADCAST COMMIT TXs
+        ###################################
+
+
+        commit_tx_objectAlice = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressAlice),
+            (BID_AMOUNT_Alice + extraTransactionFees),
+            b'').sign(ALICE_PRIVATE_KEY)
+
+        commit_tx_objectBob = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressBob),
+            (BID_AMOUNT_Bob + extraTransactionFees),
+            b'').sign(BOB_PRIVATE_KEY)
+
+        commit_tx_objectCharlie = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressCharlie),
+            (BID_AMOUNT_Charlie + extraTransactionFees),
+            b'').sign(CHARLIE_PRIVATE_KEY)
+
+        self.chain.mine(1)
+        log.info(f"Send alice submarine at block {self.chain.head_state.block_number}")
+        self.chain.direct_tx(commit_tx_objectAlice)
+        self.chain.mine(1)
+        log.info(f"Send Bob submarine at block {self.chain.head_state.block_number}")
+        self.chain.direct_tx(commit_tx_objectBob)
+
+        log.info(f"Fast forward to end of commit period")
+        self.chain.mine(COMMIT_PERIOD_LENGTH - 5)
+        log.info(f"Send Charlie submarine at block {self.chain.head_state.block_number}")
+        self.chain.direct_tx(commit_tx_objectCharlie)
+        self.chain.mine(1)
+
+
+        #####################################################
+        ## GENERATE AND BROADCAST REVEAL BID TXS
+        #####################################################
+        log.info(f"Fast forward to reveal period")
+        self.chain.mine(startRevealBlock - self.chain.head_state.block_number + 1)
+
+        ## GENERATE Prof blobs
+        log.info(f"Generate all proof blobs")
+        commit_block_numberAlice, commit_block_indexAlice = self.chain.chain.get_tx_position(commit_tx_objectAlice)
+        commit_block_numberBob, commit_block_indexBob = self.chain.chain.get_tx_position(commit_tx_objectBob)
+        commit_block_numberCharlie, commit_block_indexCharlie = self.chain.chain.get_tx_position(commit_tx_objectCharlie)
+
+        commit_proof_blobAlice = self._generate_proof_block_wrapper(
+            commit_block_numberAlice, commit_block_indexAlice, commit_tx_objectAlice, ALICE_ADDRESS)
+        commit_proof_blobBob = self._generate_proof_block_wrapper(
+            commit_block_numberBob, commit_block_indexBob, commit_tx_objectBob, BOB_ADDRESS)
+        commit_proof_blobCharlie = self._generate_proof_block_wrapper(
+            commit_block_numberCharlie, commit_block_indexCharlie, commit_tx_objectCharlie, CHARLIE_ADDRESS)
+
+        log.info(f"Generate unsigned tx for reveal")
+        unlock_tx_unsigned_rlpAlice = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoAlice)
+        unlock_tx_unsigned_rlpBob = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoBob)
+        unlock_tx_unsigned_rlpCharlie = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoCharlie)
+        _unlockExtraData = b''
+
+        log.info(f"Send Alice reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberAlice,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessAlice),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpAlice,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobAlice,  # bytes _proofBlob
+            sender=ALICE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Bob reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberBob,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessBob),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpBob,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobBob,  # bytes _proofBlob
+            sender=BOB_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Charlie reveal tx at block {self.chain.block.header.number}")
+        self.chicken_contract.reveal(
+            commit_block_numberCharlie,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessCharlie),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpCharlie,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobCharlie,  # bytes _proofBlob
+            sender=CHARLIE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        ####################################
+        ## BROADCAST UNLOCK
+        ####################################
+
+        log.info(f"Broadcast unlock for all players")
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectAlice)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectBob)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectCharlie)
+        self.chain.mine(1)
+
+        #################################################
+        # Select winner
+        #################################################
+        log.info(f"Fast forward to the end of reveal period and select winner")
+        self.chain.mine(REVEAL_PERIOD_LENGTH)
+        self.chicken_contract.selectWinner(rec_bin(endCommitBlockRaw),sender=CONTRACT_OWNER_PRIVATE_KEY)
+        self.chain.mine(1)
+        self.assertTrue(self.chicken_contract.winnerSelected())
+
+        log.info(f"Validate Bob is the winner")
+        self.assertEqual(commitBob, self.chicken_contract.winningSubmarineId().hex())
+
+        #######################################################
+        # END GAME
+        #######################################################
+        log.info(f"finalize game by all players")
+        self.chicken_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
+
+    def test_no_winner_late_commit(self):
+        """
+        Test game with all players placing a bet after the end commit block and before start reveal period
+        1. Create game and player
+        2. Wait for commit period to end
+        2. Place all bets before reveal period starts
+        3. reveal and unlock all the submarines
+        4. Select winner and finalize the game
+        5. Validate no winner was selected
+        """
+        SAME_BID_AMOUNT = BID_AMOUNT_Alice
+        self.chain.mine(1)
+        # validate initial balance
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(ALICE_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(BOB_ADDRESS)))
+        self.assertEqual(ACCOUNT_STARTING_BALANCE, self.chain.head_state.get_balance(rec_hex(CHARLIE_ADDRESS)))
+        # Validate the contract is deploied
+        self.assertTrue(self.chicken_contract.address)
+        self.assertEqual(27, self.chicken_contract.vee())
+
+        #################
+        ## START THE GAME
+        #################
+        startChickenBlock = self.chain.head_state.block_number + 1
+        startRevealBlock = self.chain.head_state.block_number + COMMIT_PERIOD_LENGTH
+        minBet = 10
+        endCommitBlockRaw = startRevealBlock - 10
+        endCommitBlockCrypt = keccak_256_encript_uint32(endCommitBlockRaw)
+
+        log.info(f"Init game with start block {startChickenBlock} and end commit block {endCommitBlockRaw}")
+        self.chicken_contract.initChickenGame(rec_bin(startChickenBlock),
+                                              rec_bin(startRevealBlock),
+                                              rec_bin(minBet),
+                                              endCommitBlockCrypt,
+                                              sender=CONTRACT_OWNER_PRIVATE_KEY)
+
+        ##################
+        # GENERATE UNLOCK TXs
+        ##################
+        log.info(f"Fast forward to block {startChickenBlock + COMMIT_PERIOD_LENGTH - 3} - the end of commit period")
+        self.chain.mine(COMMIT_PERIOD_LENGTH - 5)
+
+        log.info(f"Generate commit address and unlock transaction for Alice")
+
+        commitAddressAlice, commitAlice, witnessAlice, unlock_tx_hexAlice = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(ALICE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            SAME_BID_AMOUNT, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoAlice = rlp.decode(rec_bin(unlock_tx_hexAlice))
+        unlock_tx_objectAlice = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoAlice)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressBob, commitBob, witnessBob, unlock_tx_hexBob = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(BOB_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            SAME_BID_AMOUNT, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoBob = rlp.decode(rec_bin(unlock_tx_hexBob))
+        unlock_tx_objectBob = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoBob)
+
+        log.info(f"Generate commit address and unlock transaction for Bob")
+        commitAddressCharlie, commitCharlie, witnessCharlie, unlock_tx_hexCharlie = generate_submarine_commit.generateCommitAddress(
+            normalize_address(rec_hex(CHARLIE_ADDRESS)),
+            normalize_address(rec_hex(self.chicken_contract.address)),
+            SAME_BID_AMOUNT, b'', OURGASPRICE, OURGASLIMIT)
+        unlock_tx_infoCharlie = rlp.decode(rec_bin(unlock_tx_hexCharlie))
+        unlock_tx_objectCharlie = self._create_unlock_transaction(unlock_tx_infoAlice=unlock_tx_infoCharlie)
+
+        ###################################
+        # GENERATE + BROADCAST COMMIT TXs
+        ###################################
+
+        log.info(f"Send all submarines at the same block ({self.chain.head_state.block_number}) "
+                 f"with the same bid amount = {SAME_BID_AMOUNT}")
+
+        commit_tx_objectAlice = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressAlice),
+            (SAME_BID_AMOUNT + extraTransactionFees),
+            b'').sign(ALICE_PRIVATE_KEY)
+
+        commit_tx_objectBob = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressBob),
+            (SAME_BID_AMOUNT + extraTransactionFees),
+            b'').sign(BOB_PRIVATE_KEY)
+
+        commit_tx_objectCharlie = transactions.Transaction(
+            0, OURGASPRICE, BASIC_SEND_GAS_LIMIT, rec_bin(commitAddressCharlie),
+            (SAME_BID_AMOUNT + extraTransactionFees),
+            b'').sign(CHARLIE_PRIVATE_KEY)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(commit_tx_objectAlice)
+        self.chain.direct_tx(commit_tx_objectBob)
+        self.chain.direct_tx(commit_tx_objectCharlie)
+        self.chain.mine(1)
+
+
+        #####################################################
+        ## GENERATE AND BROADCAST REVEAL BID TXS
+        #####################################################
+        log.info(f"Fast forward to reveal period")
+        self.chain.mine(startRevealBlock - self.chain.head_state.block_number + 2)
+
+        ## GENERATE Prof blobs
+        log.info(f"Generate all proof blobs")
+        commit_block_numberAlice, commit_block_indexAlice = self.chain.chain.get_tx_position(commit_tx_objectAlice)
+        commit_block_numberBob, commit_block_indexBob = self.chain.chain.get_tx_position(commit_tx_objectBob)
+        commit_block_numberCharlie, commit_block_indexCharlie = self.chain.chain.get_tx_position(commit_tx_objectCharlie)
+
+        commit_proof_blobAlice = self._generate_proof_block_wrapper(
+            commit_block_numberAlice, commit_block_indexAlice, commit_tx_objectAlice, ALICE_ADDRESS)
+        commit_proof_blobBob = self._generate_proof_block_wrapper(
+            commit_block_numberBob, commit_block_indexBob, commit_tx_objectBob, BOB_ADDRESS)
+        commit_proof_blobCharlie = self._generate_proof_block_wrapper(
+            commit_block_numberCharlie, commit_block_indexCharlie, commit_tx_objectCharlie, CHARLIE_ADDRESS)
+
+        log.info(f"Generate unsigned tx for reveal")
+        unlock_tx_unsigned_rlpAlice = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoAlice)
+        unlock_tx_unsigned_rlpBob = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoBob)
+        unlock_tx_unsigned_rlpCharlie = self._generate_unsigned_tx(unlock_tx_info=unlock_tx_infoCharlie)
+        _unlockExtraData = b''
+
+        log.info(f"Send Alice reveal tx at block {self.chain.head_state.block_number}")
+        self.chicken_contract.reveal(
+            commit_block_numberAlice,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessAlice),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpAlice,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobAlice,  # bytes _proofBlob
+            sender=ALICE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Bob reveal tx at block {self.chain.head_state.block_number}")
+        self.chicken_contract.reveal(
+            commit_block_numberBob,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessBob),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpBob,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobBob,  # bytes _proofBlob
+            sender=BOB_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        log.info(f"Send Charlie reveal tx at block {self.chain.head_state.block_number}")
+        self.chicken_contract.reveal(
+            commit_block_numberCharlie,  # uint32 _commitBlockNumber,
+            _unlockExtraData,  # bytes _commitData,
+            rec_bin(witnessCharlie),  # bytes32 _witness,
+            unlock_tx_unsigned_rlpCharlie,  # bytes _rlpUnlockTxUnsigned,
+            commit_proof_blobCharlie,  # bytes _proofBlob
+            sender=CHARLIE_PRIVATE_KEY)
+        self.chain.mine(1)
+
+        ####################################
+        ## BROADCAST UNLOCK
+        ####################################
+
+        log.info(f"Broadcast unlock for all players")
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectAlice)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectBob)
+
+        self.chain.mine(1)
+        self.chain.direct_tx(unlock_tx_objectCharlie)
+        self.chain.mine(1)
+
+        #################################################
+        # Select winner
+        #################################################
+        log.info(f"Fast forward to the end of reveal period and select winner")
+        self.chain.mine(REVEAL_PERIOD_LENGTH)
+        self.chicken_contract.selectWinner(rec_bin(endCommitBlockRaw), sender=CONTRACT_OWNER_PRIVATE_KEY)
+        self.chain.mine(1)
+        self.assertTrue(self.chicken_contract.winnerSelected())
+
+        log.info(f"Validate no winner was selected")
+        self.assertEqual(0, int(self.chicken_contract.winningSubmarineId().hex()))
+
+        #######################################################
+        # END GAME
+        #######################################################
+        log.info(f"finalize game by all players")
+        self.chicken_contract.finalize(rec_bin(commitAlice), sender=ALICE_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitBob), sender=BOB_PRIVATE_KEY)
+        self.chicken_contract.finalize(rec_bin(commitCharlie), sender=CHARLIE_PRIVATE_KEY)
+
+
+    def _create_unlock_transaction(self, unlock_tx_infoAlice):
+        return transactions.Transaction(
+            int.from_bytes(unlock_tx_infoAlice[0], byteorder="big"),  # nonce;
+            int.from_bytes(unlock_tx_infoAlice[1], byteorder="big"),  # gasprice
+            int.from_bytes(unlock_tx_infoAlice[2], byteorder="big"),  # startgas
+            unlock_tx_infoAlice[3],  # to addr
+            int.from_bytes(unlock_tx_infoAlice[4], byteorder="big"),  # value
+            unlock_tx_infoAlice[5],  # data
+            int.from_bytes(unlock_tx_infoAlice[6], byteorder="big"),  # v
+            int.from_bytes(unlock_tx_infoAlice[7], byteorder="big"),  # r
+            int.from_bytes(unlock_tx_infoAlice[8], byteorder="big")  # s
+        )
+
+    def _generate_proof_block_wrapper(self, commit_block_number, commit_block_index, commit_tx_object, address):
+        commit_block_object = self.chain.chain.get_block_by_number(commit_block_number)
+        proveth_expected_block_format_dict = dict()
+        proveth_expected_block_format_dict['parentHash'] = commit_block_object['prevhash']
+        proveth_expected_block_format_dict['sha3Uncles'] = commit_block_object['uncles_hash']
+        proveth_expected_block_format_dict['miner'] = commit_block_object['coinbase']
+        proveth_expected_block_format_dict['stateRoot'] = commit_block_object['state_root']
+        proveth_expected_block_format_dict['transactionsRoot'] = commit_block_object['tx_list_root']
+        proveth_expected_block_format_dict['receiptsRoot'] = commit_block_object['receipts_root']
+        proveth_expected_block_format_dict['logsBloom'] = commit_block_object['bloom']
+        proveth_expected_block_format_dict['difficulty'] = commit_block_object['difficulty']
+        proveth_expected_block_format_dict['number'] = commit_block_object['number']
+        proveth_expected_block_format_dict['gasLimit'] = commit_block_object['gas_limit']
+        proveth_expected_block_format_dict['gasUsed'] = commit_block_object['gas_used']
+        proveth_expected_block_format_dict['timestamp'] = commit_block_object['timestamp']
+        proveth_expected_block_format_dict['extraData'] = commit_block_object['extra_data']
+        proveth_expected_block_format_dict['mixHash'] = commit_block_object['mixhash']
+        proveth_expected_block_format_dict['nonce'] = commit_block_object['nonce']
+        proveth_expected_block_format_dict['hash'] = commit_block_object.hash
+        proveth_expected_block_format_dict['uncles'] = []
+        transactions = []
+        for idx, transaction in enumerate(commit_block_object.transactions):
+            transactions += [{
+                "blockHash": commit_block_object.hash,
+                "blockNumber": str(hex((commit_block_object['number']))),
+                "from": checksum_encode(transaction.sender),
+                "gas": str(hex(transaction['startgas'])),
+                "gasPrice": str(hex(transaction['gasprice'])),
+                "hash": rec_hex(transaction['hash']),
+                "input": rec_hex(transaction['data']),
+                "nonce": str(hex(transaction['nonce'])),
+                "to": checksum_encode(transaction['to']),
+                "transactionIndex": str(hex(idx)),
+                "value": str(hex(transaction['value'])),
+                "v": str(hex(transaction['v'])),
+                "r": str(hex(transaction['r'])),
+                "s": str(hex(transaction['s']))
+            }]
+        proveth_expected_block_format_dict['transactions'] = transactions
+
+        return generate_proof_blob(proveth_expected_block_format_dict, commit_block_index)
+
+    def _generate_unsigned_tx(self, unlock_tx_info):
+        unlock_tx_unsigned_object = transactions.UnsignedTransaction(
+            int.from_bytes(unlock_tx_info[0], byteorder="big"),  # nonce;
+            int.from_bytes(unlock_tx_info[1], byteorder="big"),  # gasprice
+            int.from_bytes(unlock_tx_info[2], byteorder="big"),  # startgas
+            unlock_tx_info[3],  # to addr
+            int.from_bytes(unlock_tx_info[4], byteorder="big"),  # value
+            unlock_tx_info[5],  # data
+        )
+        return rlp.encode(unlock_tx_unsigned_object, transactions.UnsignedTransaction)
 
 if __name__ == "__main__":
     unittest.main()

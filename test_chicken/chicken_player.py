@@ -12,8 +12,8 @@ from web3 import Web3, HTTPProvider
 from generate_commitment.generate_submarine_commit import generateCommitAddress
 from test_chicken.test_utils import keccak_256_encript_uint32, generate_proof_blob, rec_bin, rec_hex
 
-OURGASLIMIT = 8000000
-BASIC_SEND_GAS_LIMIT = OURGASLIMIT
+OURGASLIMIT = 800000
+BASIC_SEND_GAS_LIMIT = 31000
 REVEAL_GAS_LIMIT = OURGASLIMIT
 SELECT_WIN_GAS_LIMIT = OURGASLIMIT
 FINALIZE_GAS_LIMIT = OURGASLIMIT

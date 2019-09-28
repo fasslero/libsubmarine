@@ -13,14 +13,15 @@ contract ChickenSubmarine is LibSubmarineSimple {
     // The owner of the contract and the creator of the current game
     address payable public manager;
     // Stores player information. players[_submarineId] gives us the address of the player
-    mapping (bytes32 => address) public players;
+    mapping (bytes32 => address payable) public players;
     // Stores the revealed Submarine IDs
     bytes32[] public revealedSubmarines;
     // Stores the winning Submarine ID after selecting the winner
     bytes32 public winningSubmarineId;
     // Flag for monitoring if a winner was selected
     bool public winnerSelected;
-
+    // is initiated
+    bool public isInitiated;
     // Stores the minimum bet in Wei for participating in the game
     uint96 public minBet;
     // Stores the block number of when the game starts
